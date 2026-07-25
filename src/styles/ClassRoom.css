@@ -1,0 +1,164 @@
+.classroom__back {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: transparent;
+  border: none;
+  color: #64748b;
+  font-size: 13.5px;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  padding: 0;
+  margin-bottom: 20px;
+}
+
+.classroom__back:hover {
+  color: var(--nbsc-blue-700);
+}
+
+.classroom__header {
+  margin-bottom: 24px;
+}
+
+.classroom__code {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--nbsc-blue-500);
+  letter-spacing: 0.3px;
+}
+
+.classroom__name {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text-h);
+  margin: 2px 0 6px;
+}
+
+.classroom__meta {
+  font-size: 14px;
+  color: #64748b;
+  margin: 0;
+}
+
+.classroom__gc-panel {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 20px;
+  max-width: 560px;
+}
+
+.classroom__gc-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-h);
+  margin: 0 0 14px;
+}
+
+.classroom__gc-current {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.classroom__gc-icon {
+  width: 18px;
+  height: 18px;
+  color: var(--nbsc-blue-500);
+  flex-shrink: 0;
+}
+
+.classroom__gc-link {
+  flex: 1;
+  min-width: 0;
+  font-size: 14px;
+  color: var(--nbsc-blue-600);
+  text-decoration: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.classroom__gc-link:hover {
+  text-decoration: underline;
+}
+
+.classroom__gc-edit {
+  flex-shrink: 0;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: inherit;
+  color: #475569;
+  cursor: pointer;
+}
+
+.classroom__gc-edit:hover {
+  background: var(--nbsc-blue-100);
+  color: var(--nbsc-blue-700);
+}
+
+.classroom__gc-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.classroom__gc-form input {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 14px;
+  font-family: inherit;
+  color: var(--text-h);
+  outline: none;
+}
+
+.classroom__gc-form input:focus {
+  border-color: var(--nbsc-blue-500);
+}
+
+.classroom__gc-form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.classroom__gc-cancel {
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 9px 16px;
+  font-size: 14px;
+  font-weight: 600;
+  font-family: inherit;
+  color: #475569;
+  cursor: pointer;
+}
+
+.classroom__gc-save {
+  background: var(--nbsc-blue-500);
+  border: none;
+  border-radius: 8px;
+  padding: 9px 16px;
+  font-size: 14px;
+  font-weight: 600;
+  font-family: inherit;
+  color: #fff;
+  cursor: pointer;
+}
+
+.classroom__gc-save:hover {
+  opacity: 0.9;
+}
+
+.classroom__gc-saved {
+  color: #16a34a;
+  font-size: 13px;
+  font-weight: 600;
+  margin: 10px 0 0;
+}
