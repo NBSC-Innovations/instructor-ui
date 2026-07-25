@@ -4,8 +4,19 @@ import Dashboard from './pages/Dashboard.jsx'
 import MySubjects from './pages/MySubjects.jsx'
 import GroupChats from './pages/GroupChats.jsx'
 import ClassRoom from './pages/ClassRoom.jsx'
+import Profile from './pages/Profile.jsx'
 import mySubjectsData from './data/mySubjects.js'
 import './App.css'
+
+// TEMP MOCK — replace with the logged-in instructor's row from Supabase Auth /
+// InstructorProfiles once that's wired up. Email stays read-only in the UI since
+// it's the verified institutional identity, not a self-editable field.
+const mockProfile = {
+  fullName: 'Juan Dela Cruz',
+  email: 'juan.delacruz@nbsc.edu.ph',
+  department: 'Institute for Computer Studies (ICS)',
+  contactNumber: '',
+}
 
 function MenuIcon(props) {
   return (
@@ -28,6 +39,7 @@ function App() {
   // ClassRoom.jsx) rather than loading every message up front like this mock does.
   const [subjects, setSubjects] = useState(mySubjectsData)
   const [selectedSubjectId, setSelectedSubjectId] = useState(null)
+  const [profile, setProfile] = useState(mockProfile)
 
   const handleNavigate = (id) => {
     setActivePage(id)
@@ -86,6 +98,11 @@ function App() {
     )
   }
 
+  const handleSaveProfile = (updated) => {
+    // TODO: replace with a Supabase update on InstructorProfiles.
+    setProfile(updated)
+  }
+
   const currentLabel = navItems.find((item) => item.id === activePage)?.label ?? ''
   const selectedSubject = subjects.find((s) => s.id === selectedSubjectId)
 
@@ -108,8 +125,8 @@ function App() {
         return <MySubjects subjects={subjects} onEnterSubject={handleEnterSubject} />
       case 'group-chats':
         return <GroupChats subjects={subjects} onEnterSubject={handleEnterSubject} />
-      // case 'profile':
-      //   return <Profile />
+      case 'profile':
+        return <Profile profile={profile} onSave={handleSaveProfile} />
       default:
         return <Dashboard subjects={subjects} onEnterSubject={handleEnterSubject} />
     }
@@ -147,7 +164,9 @@ function App() {
         </header>
 
         <main className="content-area">
-          {renderPage()}
+          <div className="page-container">
+            {renderPage()}
+          </div>
         </main>
       </div>
     </div>
