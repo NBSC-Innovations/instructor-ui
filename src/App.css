@@ -84,6 +84,16 @@
 .content-area {
   flex: 1;
   padding: 28px;
+  display: flex;
+  justify-content: center;
+}
+
+/* Keeps content at a comfortable reading width on wide desktop monitors instead of
+   stretching cards/chat bubbles edge-to-edge. Pages that want to use the full
+   available width (rare) can override with a width:100% wrapper of their own. */
+.page-container {
+  width: 100%;
+  max-width: 1180px;
 }
 
 @media (max-width: 1024px) {
