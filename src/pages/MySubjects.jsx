@@ -21,6 +21,12 @@ function ArrowRightIcon(props) {
   )
 }
 
+// NOTE on state: a section's chat auto-generates the moment the first student is
+// matched into it (confirmed logic) — there is no manual "create chat" step for the
+// instructor. So there are only two real states here:
+//   - enrolledCount === 0  -> "Waiting for students" (chat doesn't exist yet)
+//   - enrolledCount > 0    -> chat exists -> "Enter"
+
 function MySubjects({ subjects, onEnterSubject }) {
   const [query, setQuery] = useState('')
 
@@ -38,7 +44,7 @@ function MySubjects({ subjects, onEnterSubject }) {
     <section className="my-subjects">
       <h2 className="my-subjects__heading">My Subjects</h2>
       <p className="my-subjects__subtext">
-        Subjects currently assigned to you. Once students are matched to a section, you can enter it to manage the class group chat.
+        Subjects currently assigned to you. A group chat is created automatically once students are matched to a section.
       </p>
 
       <div className="my-subjects__search">
@@ -57,8 +63,8 @@ function MySubjects({ subjects, onEnterSubject }) {
         )}
 
         {filtered.map((subject) => {
-          const hasStudents = subject.enrolledCount > 0
-          const hasGc = Boolean(subject.gcLink)
+          const hasChat = subject.enrolledCount > 0
+          const messageCount = subject.messages?.length ?? 0
 
           return (
             <div key={subject.id} className="subject-card">
@@ -69,16 +75,18 @@ function MySubjects({ subjects, onEnterSubject }) {
                   <span>{subject.section}</span>
                   <span className="subject-card__dot">&middot;</span>
                   <span>{subject.enrolledCount} student{subject.enrolledCount === 1 ? '' : 's'} enrolled</span>
-                  {hasGc && (
+                  {hasChat && (
                     <>
                       <span className="subject-card__dot">&middot;</span>
-                      <span className="subject-card__gc-badge">GC set</span>
+                      <span className="subject-card__msg-count">
+                        {messageCount} message{messageCount === 1 ? '' : 's'}
+                      </span>
                     </>
                   )}
                 </div>
               </div>
 
-              {hasStudents ? (
+              {hasChat ? (
                 <button
                   type="button"
                   className="subject-card__enter"
