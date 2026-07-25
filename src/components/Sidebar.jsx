@@ -12,21 +12,12 @@ function DashboardIcon(props) {
   )
 }
 
-function FindGcIcon(props) {
+function MySubjectsIcon(props) {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
       strokeLinecap="round" strokeLinejoin="round" {...props}>
-      <circle cx="11" cy="11" r="7" />
-      <line x1="21" y1="21" x2="16.65" y2="16.65" />
-    </svg>
-  )
-}
-
-function GroupChatsIcon(props) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
-      strokeLinecap="round" strokeLinejoin="round" {...props}>
-      <path d="M21 15a2 2 0 0 1-2 2H8l-5 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+      <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+      <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
     </svg>
   )
 }
@@ -55,8 +46,7 @@ function LogoutIcon(props) {
 // eslint-disable-next-line react-refresh/only-export-components
 export const navItems = [
   { id: 'dashboard', label: 'Dashboard', icon: DashboardIcon },
-  { id: 'find-gc', label: 'Find Group Chat', icon: FindGcIcon },
-  { id: 'group-chats', label: 'Group Chats', icon: GroupChatsIcon },
+  { id: 'my-subjects', label: 'My Subjects', icon: MySubjectsIcon },
   { id: 'profile', label: 'Profile', icon: ProfileIcon },
 ]
 
@@ -73,7 +63,7 @@ function Sidebar({ activePage, onNavigate, isOpen, onClose, onLogout }) {
         <div className="sidebar__brand">
           <div className="sidebar__logo">NBSC</div>
           <div className="sidebar__brand-text">
-            <span className="sidebar__brand-title">Student Portal</span>
+            <span className="sidebar__brand-title">Instructor Portal</span>
             <span className="sidebar__brand-sub">Northern Bukidnon State College</span>
           </div>
         </div>
