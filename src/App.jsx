@@ -1,6 +1,9 @@
 import { useState } from 'react'
 import Sidebar, { navItems } from './components/Sidebar.jsx'
 import Dashboard from './pages/Dashboard.jsx'
+import MySubjects from './pages/MySubjects.jsx'
+import ClassRoom from './pages/ClassRoom.jsx'
+import mySubjectsData from './data/mySubjects.js'
 import './App.css'
 
 function MenuIcon(props) {
@@ -18,26 +21,55 @@ function App() {
   const [activePage, setActivePage] = useState('dashboard')
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
+  // Subject data lives here for now (mock). Once Supabase is wired up,
+  // replace this with a fetch of sections assigned to the logged-in instructor.
+  const [subjects, setSubjects] = useState(mySubjectsData)
+  const [selectedSubjectId, setSelectedSubjectId] = useState(null)
+
   const handleNavigate = (id) => {
     setActivePage(id)
+    setSelectedSubjectId(null) // leaving My Subjects resets any open classroom
     setSidebarOpen(false)
   }
 
   const handleLogout = () => {
-    // TODO: wire up actual logout logic
+    // TODO: wire up actual logout logic (Supabase Auth signOut)
     console.log('Logout clicked')
   }
 
+  const handleEnterSubject = (subjectId) => {
+    setSelectedSubjectId(subjectId)
+  }
+
+  const handleBackToSubjects = () => {
+    setSelectedSubjectId(null)
+  }
+
+  const handleSaveLink = (subjectId, link) => {
+    // TODO: replace with Supabase update once the GCPosts table exists
+    setSubjects((prev) =>
+      prev.map((s) => (s.id === subjectId ? { ...s, gcLink: link } : s))
+    )
+  }
+
   const currentLabel = navItems.find((item) => item.id === activePage)?.label ?? ''
+  const selectedSubject = subjects.find((s) => s.id === selectedSubjectId)
 
   const renderPage = () => {
     switch (activePage) {
       case 'dashboard':
         return <Dashboard />
-      // case 'find-gc':
-      //   return <FindGc />
-      // case 'group-chats':
-      //   return <GroupChats />
+      case 'my-subjects':
+        if (selectedSubject) {
+          return (
+            <ClassRoom
+              subject={selectedSubject}
+              onBack={handleBackToSubjects}
+              onSaveLink={handleSaveLink}
+            />
+          )
+        }
+        return <MySubjects subjects={subjects} onEnterSubject={handleEnterSubject} />
       // case 'profile':
       //   return <Profile />
       default:
@@ -59,10 +91,12 @@ function App() {
         <header className="topbar">
           <div className="topbar__brand">
             <div className="topbar__logo">NBSC</div>
-            <span className="topbar__brand-text">NBSC SIS</span>
+            <span className="topbar__brand-text">NBSC Instructor</span>
           </div>
 
-          <h1 className="topbar__title">{currentLabel}</h1>
+          <h1 className="topbar__title">
+            {selectedSubject ? selectedSubject.code : currentLabel}
+          </h1>
 
           <button
             type="button"
