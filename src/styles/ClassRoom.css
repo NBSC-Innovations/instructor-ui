@@ -121,7 +121,7 @@
 }
 
 .chat-message__bubble {
-  max-width: 70%;
+  max-width: min(70%, 520px);
   padding: 9px 12px;
   border-radius: 12px;
   font-size: 14px;
