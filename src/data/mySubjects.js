@@ -1,17 +1,23 @@
 // src/data/mySubjects.js
 //
-// TEMP MOCK DATA — replace with a Supabase query once the backend/schema is ready.
-// Expected real query: sections where instructor_id = current logged-in instructor's id,
-// joined with subjects (code, name) and a count of studentEnrollments for that section.
+// TEMP MOCK DATA — replace with real Supabase queries once backend is ready.
 //
-// Shape to keep when you wire up the real data:
-//   id            -> section id (not just subject code, since one subject can have
-//                     multiple sections/instructors — keep this unique per section)
-//   code          -> subject code, e.g. "IT311"
-//   name          -> subject name
-//   section       -> section label, e.g. "BSIT 3A"
-//   enrolledCount -> number of students currently matched to this section
-//   gcLink        -> the group chat link the instructor has set, empty string if none yet
+// Real-world equivalent of this file:
+//   1. `sections` query: sections where instructor_id (or a SectionInstructors join
+//      row) = current instructor, for the active term.
+//   2. enrolledCount: count of StudentEnrollments for that section.
+//   3. messages: NOT meant to be fetched all at once in production — this is only
+//      inlined here because it's mock data. Real chat messages should be fetched
+//      per-section, paginated (most recent N, load older on scroll), and eventually
+//      subscribed to via Supabase Realtime. Do not port this "load everything up
+//      front" pattern into the real implementation.
+//
+// GC / chat existence logic (confirmed): a chat auto-generates the moment the first
+// student is matched into a section — there is no manual "create" step. So in this
+// mock data, enrolledCount > 0 implies the chat already exists.
+
+const now = Date.now()
+const minutesAgo = (m) => new Date(now - m * 60 * 1000).toISOString()
 
 const mySubjects = [
   {
@@ -20,7 +26,32 @@ const mySubjects = [
     name: 'System Integration and Architecture',
     section: 'BSIT 3A',
     enrolledCount: 32,
-    gcLink: 'https://m.me/sample-it311-3a',
+    messages: [
+      {
+        id: 'm1',
+        senderName: 'You',
+        senderRole: 'instructor',
+        content: 'Welcome to IT311! Post your questions here anytime.',
+        createdAt: minutesAgo(180),
+        pinned: true,
+      },
+      {
+        id: 'm2',
+        senderName: 'Dela Cruz, J.',
+        senderRole: 'student',
+        content: 'Good day po sir, what time po ba tayo mag-uumpisa this week?',
+        createdAt: minutesAgo(45),
+        pinned: false,
+      },
+      {
+        id: 'm3',
+        senderName: 'You',
+        senderRole: 'instructor',
+        content: '9AM as usual, room ICT-2.',
+        createdAt: minutesAgo(40),
+        pinned: false,
+      },
+    ],
   },
   {
     id: 'sec-2',
@@ -28,7 +59,7 @@ const mySubjects = [
     name: 'Information Assurance and Security',
     section: 'BSIT 3B',
     enrolledCount: 0,
-    gcLink: '',
+    messages: [],
   },
   {
     id: 'sec-3',
@@ -36,7 +67,16 @@ const mySubjects = [
     name: 'Application Development and Emerging Technologies',
     section: 'BSIT 3A',
     enrolledCount: 28,
-    gcLink: '',
+    messages: [
+      {
+        id: 'm4',
+        senderName: 'You',
+        senderRole: 'instructor',
+        content: 'Reminder: bring your laptops next meeting.',
+        createdAt: minutesAgo(600),
+        pinned: false,
+      },
+    ],
   },
 ]
 
