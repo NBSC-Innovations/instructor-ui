@@ -2,6 +2,7 @@ import { useState } from 'react'
 import Sidebar, { navItems } from './components/Sidebar.jsx'
 import Dashboard from './pages/Dashboard.jsx'
 import MySubjects from './pages/MySubjects.jsx'
+import GroupChats from './pages/GroupChats.jsx'
 import ClassRoom from './pages/ClassRoom.jsx'
 import mySubjectsData from './data/mySubjects.js'
 import './App.css'
@@ -21,14 +22,16 @@ function App() {
   const [activePage, setActivePage] = useState('dashboard')
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
-  // Subject data lives here for now (mock). Once Supabase is wired up,
-  // replace this with a fetch of sections assigned to the logged-in instructor.
+  // Subject + chat data lives here for now (mock). Once Supabase is wired up,
+  // replace this with: a fetch of sections assigned to the logged-in instructor,
+  // and per-section paginated message fetches (see notes in mySubjects.js and
+  // ClassRoom.jsx) rather than loading every message up front like this mock does.
   const [subjects, setSubjects] = useState(mySubjectsData)
   const [selectedSubjectId, setSelectedSubjectId] = useState(null)
 
   const handleNavigate = (id) => {
     setActivePage(id)
-    setSelectedSubjectId(null) // leaving My Subjects resets any open classroom
+    setSelectedSubjectId(null) // leaving a list page closes any open chat
     setSidebarOpen(false)
   }
 
@@ -37,18 +40,49 @@ function App() {
     console.log('Logout clicked')
   }
 
+  // Entering a chat doesn't have to come from My Subjects specifically — Dashboard
+  // and Group Chats both link into the same chat screen, so this just needs to set
+  // the selected id; renderPage() below decides what's shown based on activePage
+  // + selectedSubjectId together.
   const handleEnterSubject = (subjectId) => {
     setSelectedSubjectId(subjectId)
   }
 
-  const handleBackToSubjects = () => {
+  const handleBackFromChat = () => {
     setSelectedSubjectId(null)
   }
 
-  const handleSaveLink = (subjectId, link) => {
-    // TODO: replace with Supabase update once the GCPosts table exists
+  const handleSendMessage = (subjectId, content) => {
+    // TODO: replace with a Supabase insert into `messages`, then eventually a
+    // Realtime subscription instead of local state once that's wired up.
     setSubjects((prev) =>
-      prev.map((s) => (s.id === subjectId ? { ...s, gcLink: link } : s))
+      prev.map((s) => {
+        if (s.id !== subjectId) return s
+        const newMessage = {
+          id: `m-${Date.now()}`,
+          senderName: 'You',
+          senderRole: 'instructor',
+          content,
+          createdAt: new Date().toISOString(),
+          pinned: false,
+        }
+        return { ...s, messages: [...(s.messages ?? []), newMessage] }
+      })
+    )
+  }
+
+  const handleTogglePin = (subjectId, messageId) => {
+    // TODO: replace with a Supabase update on the message's `pinned` column.
+    setSubjects((prev) =>
+      prev.map((s) => {
+        if (s.id !== subjectId) return s
+        return {
+          ...s,
+          messages: s.messages.map((m) =>
+            m.id === messageId ? { ...m, pinned: !m.pinned } : m
+          ),
+        }
+      })
     )
   }
 
@@ -56,24 +90,28 @@ function App() {
   const selectedSubject = subjects.find((s) => s.id === selectedSubjectId)
 
   const renderPage = () => {
+    if (selectedSubject) {
+      return (
+        <ClassRoom
+          subject={selectedSubject}
+          onBack={handleBackFromChat}
+          onSendMessage={handleSendMessage}
+          onTogglePin={handleTogglePin}
+        />
+      )
+    }
+
     switch (activePage) {
       case 'dashboard':
-        return <Dashboard />
+        return <Dashboard subjects={subjects} onEnterSubject={handleEnterSubject} />
       case 'my-subjects':
-        if (selectedSubject) {
-          return (
-            <ClassRoom
-              subject={selectedSubject}
-              onBack={handleBackToSubjects}
-              onSaveLink={handleSaveLink}
-            />
-          )
-        }
         return <MySubjects subjects={subjects} onEnterSubject={handleEnterSubject} />
+      case 'group-chats':
+        return <GroupChats subjects={subjects} onEnterSubject={handleEnterSubject} />
       // case 'profile':
       //   return <Profile />
       default:
-        return <Dashboard />
+        return <Dashboard subjects={subjects} onEnterSubject={handleEnterSubject} />
     }
   }
 
