@@ -24,8 +24,8 @@ flow actually does, so expect this doc to need updates once that side is finaliz
 ## Tech Stack
 
 - **React + Vite**
-- **Supabase** (Auth, Postgres, RLS) — planned, **not yet connected**. Everything in
-  this repo currently runs on local mock state (see "Mock data" below).
+- **Supabase** (Auth, Postgres, RLS) — **connected and active**. All data is fetched
+  from the database using the service functions in `src/services/database.js`.
 - Plain CSS (no framework) using a shared set of CSS custom properties for the NBSC
   navy theme — see `src/index.css`.
 
@@ -43,8 +43,8 @@ src/
     GroupChats.jsx       Recent/active conversations, sorted by last message
     ClassRoom.jsx        The actual chat screen (opened from any of the above)
     Profile.jsx           Instructor's own profile (view/edit)
-  data/
-    mySubjects.js       MOCK DATA — sections, enrollment counts, chat messages
+  services/
+    database.js         Supabase database operations (fetch profiles, sections, messages)
   styles/
     *.css               One stylesheet per page/component
   App.jsx               Top-level state + routing between pages
@@ -80,43 +80,38 @@ A few decisions that shape the code and are worth knowing before changing anythi
 
 ---
 
-## Mock Data — `src/data/mySubjects.js`
+## Database Integration (Supabase)
 
-Every page currently reads from `mySubjectsData`, held in `App.jsx` state
-(`subjects`). It simulates:
+The application is now fully connected to Supabase using a comprehensive student management system schema. All data operations are handled through service functions in `src/services/database.js`:
 
-```js
-{
-  id, code, name, section, enrolledCount,
-  messages: [{ id, senderName, senderRole, content, createdAt, pinned }]
-}
-```
+### Database Tables
 
-This is **not** how the real data should be fetched — see below.
+- **profiles**: Stores user information (id, email, full_name, role, student_id, department, avatar_url, bio)
+- **courses**: Stores course information (id, code, title, description, instructor_id, department, credits, max_students, current_students, semester, academic_year, schedule, is_active)
+- **sections**: Stores section information (id, course_id, name, instructor_id, schedule, room, max_capacity, current_enrollment)
+- **enrollments**: Tracks student enrollments (id, student_id, course_id, status, enrolled_at, completed_at, final_grade)
+- **gc_messages**: Stores group chat messages (id, course_id, sender_id, content, created_at, edited_at, is_deleted, reply_to)
+- **group_chats**: Stores group chat information (id, course_id, name, created_at)
+- **group_chat_members**: Tracks group chat memberships (id, group_chat_id, user_id, joined_at)
 
----
+### Service Functions
 
-## Backend Integration Points (Supabase — not built yet)
+- `fetchInstructorProfile(email)`: Fetch instructor profile by email from profiles table
+- `fetchInstructorCourses(instructorId)`: Fetch all courses for an instructor
+- `fetchCourseSections(courseId)`: Fetch sections for a specific course
+- `fetchCourseMessages(courseId)`: Fetch messages for a specific course from gc_messages table
+- `sendMessage(courseId, senderId, content)`: Send a new message to a course
+- `updateInstructorProfile(profileId, updates)`: Update instructor profile in profiles table
+- `fetchCoursesWithMessages(instructorId)`: Fetch complete course data with messages for instructor
 
-These are the specific spots in the code with `TODO` comments marking where mock
-state needs to become a real Supabase call:
+### Row Level Security (RLS)
 
-| File | What it fakes now | What it should become |
-|---|---|---|
-| `data/mySubjects.js` | Hardcoded array | Query: sections assigned to the logged-in instructor for the active term, joined with enrollment counts |
-| `App.jsx` → `handleSendMessage` | Appends to local state | Insert into a `messages` table |
-| `App.jsx` → `handleTogglePin` | Toggles local state | Update the `pinned` column on that message |
-| `App.jsx` → `handleSaveProfile` | Updates local state | Update on the instructor's `InstructorProfiles` row |
-| `App.jsx` → `handleLogout` | `console.log` only | `supabase.auth.signOut()` |
-| `ClassRoom.jsx` | Loads all messages for a section at once | Should be paginated (most recent N, load older on scroll) — do this **before** adding Realtime, not after; get plain fetch/insert correct first |
-| Chat delivery (not built) | N/A | Supabase Realtime subscription per open section, added only after the above works |
-
-**On the instructor↔section assignment problem specifically:** since there's no
-SIS integration, the realistic options are (a) instructor self-claims a section via
-search, or (b) self-claim + admin/CSG approval before it grants chat access. Given
-that a claim now grants entry into a live chat with real students (not just a
-passive link), leaning toward requiring some verification step is safer — this
-needs a decision from the team, not just from this UI.
+The database implements comprehensive RLS policies to ensure:
+- Instructors can only access their own profile
+- Instructors can only view and manage their assigned courses
+- Instructors can only read messages from courses they teach
+- Students can only access their enrolled courses and messages
+- All data access is properly scoped based on user roles and relationships
 
 ---
 
@@ -153,11 +148,47 @@ Sidebar collapses into a mobile drawer under 1024px — see `Sidebar.css`.
 
 ## Running Locally
 
+### Prerequisites
+
+1. Node.js and npm installed
+2. Supabase project set up with the database schema
+
+### Database Setup
+
+1. Open your Supabase project dashboard
+2. Go to the SQL Editor
+3. Run the SQL script from `supabase-schema.sql` to create:
+   - Comprehensive database tables (profiles, courses, sections, enrollments, gc_messages, etc.)
+   - Row Level Security policies
+   - Functions and triggers for automatic profile creation and group chat management
+   - Helper views for dashboards
+   - Realtime subscriptions for gc_messages
+
+4. Create a Supabase Auth user with email `20231025@nbsc.edu.ph`:
+   - Go to Authentication > Users
+   - Click "Add user" and create a user with email `20231025@nbsc.edu.ph`
+   - Set a password and enable email confirmation
+   - The profile will be automatically created by the `handle_new_user` trigger
+
+5. After creating the auth user, run the test data section at the bottom of `supabase-schema.sql`:
+   - This will create test courses (IT311, IT312, IT301)
+   - Create test sections
+   - Add sample messages for testing
+
+6. Configure your `.env` file with your Supabase credentials:
+   ```
+   VITE_SUPABASE_URL=your_supabase_project_url
+   VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
+   ```
+
+### Installation & Running
+
 ```bash
 npm install
 npm run dev
 ```
 
-Standard Vite dev server. No environment variables needed yet since there's no
-backend connection — that'll change once Supabase is wired in (client keys, etc.
-will need a `.env` at that point, not committed to the repo).
+### Development
+
+Standard Vite dev server. The application connects to Supabase using the credentials
+in your `.env` file.

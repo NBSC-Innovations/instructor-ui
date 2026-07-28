@@ -42,7 +42,7 @@ function getInitials(name) {
 
 function Profile({ profile, onSave }) {
   const [isEditing, setIsEditing] = useState(false)
-  const [form, setForm] = useState(profile)
+  const [form, setForm] = useState(profile || {})
 
   const handleChange = (field) => (e) => {
     setForm((f) => ({ ...f, [field]: e.target.value }))
@@ -63,12 +63,20 @@ function Profile({ profile, onSave }) {
     <section className="profile">
       <div className="profile__card">
         <div className="profile__header">
-          <div className="profile__avatar">{getInitials(profile.fullName)}</div>
+          {profile?.avatarUrl ? (
+            <img 
+              src={profile.avatarUrl} 
+              alt={profile.fullName || 'Profile'} 
+              className="profile__avatar profile__avatar--image"
+            />
+          ) : (
+            <div className="profile__avatar">{getInitials(profile?.fullName || 'User')}</div>
+          )}
           <div className="profile__header-text">
-            <h2 className="profile__name">{profile.fullName}</h2>
+            <h2 className="profile__name">{profile?.fullName || 'Loading...'}</h2>
             <span className="profile__role-badge">Instructor</span>
           </div>
-          {!isEditing && (
+          {!isEditing && profile && (
             <button type="button" className="profile__edit-btn" onClick={() => setIsEditing(true)}>
               <EditIcon width={15} height={15} />
               Edit
@@ -80,16 +88,18 @@ function Profile({ profile, onSave }) {
           <div className="profile__details">
             <div className="profile__field">
               <span className="profile__field-label">Institutional Email</span>
-              <span className="profile__field-value">{profile.email}</span>
+              <span className="profile__field-value">{profile?.email || '—'}</span>
             </div>
             <div className="profile__field">
               <span className="profile__field-label">Department</span>
-              <span className="profile__field-value">{profile.department}</span>
+              <span className="profile__field-value">{profile?.department || '—'}</span>
             </div>
-            <div className="profile__field">
-              <span className="profile__field-label">Contact Number</span>
-              <span className="profile__field-value">{profile.contactNumber || '—'}</span>
-            </div>
+            {profile?.bio && (
+              <div className="profile__field">
+                <span className="profile__field-label">Bio</span>
+                <span className="profile__field-value profile__field-value--bio">{profile.bio}</span>
+              </div>
+            )}
           </div>
         ) : (
           <form className="profile__form" onSubmit={handleSave}>
@@ -97,7 +107,7 @@ function Profile({ profile, onSave }) {
               Full Name
               <input
                 type="text"
-                value={form.fullName}
+                value={form.fullName || ''}
                 onChange={handleChange('fullName')}
                 required
               />
@@ -105,12 +115,12 @@ function Profile({ profile, onSave }) {
 
             <label className="profile__label">
               Institutional Email
-              <input type="email" value={form.email} disabled />
+              <input type="email" value={form.email || ''} disabled />
             </label>
 
             <label className="profile__label">
               Department
-              <select value={form.department} onChange={handleChange('department')}>
+              <select value={form.department || ''} onChange={handleChange('department')}>
                 {DEPARTMENTS.map((d) => (
                   <option key={d} value={d}>{d}</option>
                 ))}
@@ -118,12 +128,22 @@ function Profile({ profile, onSave }) {
             </label>
 
             <label className="profile__label">
-              Contact Number
+              Avatar URL
               <input
-                type="tel"
-                placeholder="e.g. 0917 000 0000"
-                value={form.contactNumber}
-                onChange={handleChange('contactNumber')}
+                type="url"
+                placeholder="https://example.com/avatar.jpg"
+                value={form.avatarUrl || ''}
+                onChange={handleChange('avatarUrl')}
+              />
+            </label>
+
+            <label className="profile__label">
+              Bio
+              <textarea
+                placeholder="Tell us about yourself..."
+                value={form.bio || ''}
+                onChange={handleChange('bio')}
+                rows={4}
               />
             </label>
 

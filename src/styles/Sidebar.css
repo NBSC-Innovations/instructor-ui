@@ -37,6 +37,12 @@
   border-bottom: 1px solid var(--border);
 }
 
+.sidebar__logo-img {
+  width: 48px;
+  height: auto;
+  flex-shrink: 0;
+}
+
 .sidebar__logo {
   width: 40px;
   height: 40px;

@@ -1,4 +1,5 @@
 import '../styles/Sidebar.css'
+import NbscLogo from '../assets/Nbsc-logo.png'
 
 function DashboardIcon(props) {
   return (
@@ -71,7 +72,7 @@ function Sidebar({ activePage, onNavigate, isOpen, onClose, onLogout }) {
 
       <aside className={`sidebar ${isOpen ? 'sidebar--open' : ''}`}>
         <div className="sidebar__brand">
-          <div className="sidebar__logo">NBSC</div>
+          <img src={NbscLogo} alt="NBSC" className="sidebar__logo-img" />
           <div className="sidebar__brand-text">
             <span className="sidebar__brand-title">Instructor Portal</span>
             <span className="sidebar__brand-sub">Northern Bukidnon State College</span>

@@ -30,6 +30,11 @@
   justify-content: center;
   font-weight: 700;
   font-size: 18px;
+  object-fit: cover;
+}
+
+.profile__avatar--image {
+  background: transparent;
 }
 
 .profile__header-text {
@@ -109,6 +114,11 @@
   color: var(--text-h);
 }
 
+.profile__field-value--bio {
+  line-height: 1.6;
+  white-space: pre-wrap;
+}
+
 .profile__form {
   display: flex;
   flex-direction: column;
@@ -125,7 +135,8 @@
 }
 
 .profile__label input,
-.profile__label select {
+.profile__label select,
+.profile__label textarea {
   border: 1px solid var(--border);
   border-radius: 8px;
   padding: 10px 12px;
@@ -134,10 +145,12 @@
   color: var(--text-h);
   outline: none;
   background: #fff;
+  resize: vertical;
 }
 
 .profile__label input:focus,
-.profile__label select:focus {
+.profile__label select:focus,
+.profile__label textarea:focus {
   border-color: var(--nbsc-blue-500);
 }
 

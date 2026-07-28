@@ -1,22 +1,22 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Sidebar, { navItems } from './components/Sidebar.jsx'
 import Dashboard from './pages/Dashboard.jsx'
 import MySubjects from './pages/MySubjects.jsx'
 import GroupChats from './pages/GroupChats.jsx'
 import ClassRoom from './pages/ClassRoom.jsx'
 import Profile from './pages/Profile.jsx'
-import mySubjectsData from './data/mySubjects.js'
+import { supabase } from './utils/supabaseClient'
+import { useToast } from './utils/toast.jsx'
+import Login from './pages/Login.jsx'
+import NbscLogo from './assets/Nbsc-logo.png'
+import { 
+  fetchInstructorProfile, 
+  fetchCoursesWithMessages,
+  updateInstructorProfile,
+  sendMessage,
+  toggleMessagePin
+} from './services/database'
 import './App.css'
-
-// TEMP MOCK — replace with the logged-in instructor's row from Supabase Auth /
-// InstructorProfiles once that's wired up. Email stays read-only in the UI since
-// it's the verified institutional identity, not a self-editable field.
-const mockProfile = {
-  fullName: 'Juan Dela Cruz',
-  email: 'juan.delacruz@nbsc.edu.ph',
-  department: 'Institute for Computer Studies (ICS)',
-  contactNumber: '',
-}
 
 function MenuIcon(props) {
   return (
@@ -30,16 +30,109 @@ function MenuIcon(props) {
 }
 
 function App() {
+  const [session, setSession] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [authError, setAuthError] = useState('')
   const [activePage, setActivePage] = useState('dashboard')
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const toast = useToast()
 
-  // Subject + chat data lives here for now (mock). Once Supabase is wired up,
-  // replace this with: a fetch of sections assigned to the logged-in instructor,
-  // and per-section paginated message fetches (see notes in mySubjects.js and
-  // ClassRoom.jsx) rather than loading every message up front like this mock does.
-  const [subjects, setSubjects] = useState(mySubjectsData)
+  const [subjects, setSubjects] = useState([])
   const [selectedSubjectId, setSelectedSubjectId] = useState(null)
-  const [profile, setProfile] = useState(mockProfile)
+  const [profile, setProfile] = useState(null)
+  const [dataLoading, setDataLoading] = useState(false)
+
+  // Fetch instructor profile and courses when session is established
+  useEffect(() => {
+    const loadInstructorData = async () => {
+      if (!session?.user?.email) return
+
+      console.log('[App] Loading instructor data for:', session.user.email)
+      setDataLoading(true)
+      try {
+        // Fetch instructor profile
+        const instructorProfile = await fetchInstructorProfile(session.user.email)
+        console.log('[App] Instructor profile fetched:', instructorProfile)
+
+        if (instructorProfile) {
+          setProfile({
+            id: instructorProfile.id,
+            fullName: instructorProfile.full_name,
+            email: instructorProfile.email,
+            department: instructorProfile.department,
+            contactNumber: '', // profiles table doesn't have contact_number
+            avatarUrl: instructorProfile.avatar_url,
+            bio: instructorProfile.bio,
+          })
+
+          // Fetch courses with messages
+          const coursesData = await fetchCoursesWithMessages(instructorProfile.id)
+          console.log('[App] Courses data fetched:', coursesData)
+          setSubjects(coursesData)
+        } else {
+          console.log('[App] No instructor profile found for:', session.user.email)
+          // Check if this is the allowed exception email
+          if (session.user.email === '20221224@nbsc.edu.ph') {
+            toast.error('Profile not found for 20221224@nbsc.edu.ph. Please run the SQL setup script.')
+          } else {
+            toast.error('Access denied. This portal is for instructors only. Students should use the Student Portal.')
+            // Sign out the student user
+            await supabase.auth.signOut()
+            setSession(null)
+          }
+        }
+      } catch (error) {
+        console.error('[App] Error loading instructor data:', error)
+        toast.error('Failed to load data. Please try again.')
+      } finally {
+        setDataLoading(false)
+      }
+    }
+
+    loadInstructorData()
+  }, [session]) // eslint-disable-line
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user?.email) {
+        setSession(session)
+      } else if (session) {
+        supabase.auth.signOut()
+        setAuthError('Invalid session.')
+      }
+      setLoading(false)
+    })
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      console.log('[Auth]', _event, session?.user?.email ?? 'no session')
+
+      if (_event === 'SIGNED_OUT') {
+        setSession(null)
+        setAuthError('')
+        setLoading(false)
+        setProfile(null)
+        setSubjects([])
+        return
+      }
+
+      if (_event === 'SIGNED_IN' && session?.user?.email) {
+        setSession(session)
+        setAuthError('')
+        setLoading(false)
+        return
+      }
+
+      if (session?.user?.email) {
+        setSession(session)
+        setAuthError('')
+      } else {
+        setSession(null)
+      }
+      setLoading(false)
+    })
+
+    return () => subscription.unsubscribe()
+  }, []) // eslint-disable-line
 
   const handleNavigate = (id) => {
     setActivePage(id)
@@ -47,9 +140,9 @@ function App() {
     setSidebarOpen(false)
   }
 
-  const handleLogout = () => {
-    // TODO: wire up actual logout logic (Supabase Auth signOut)
-    console.log('Logout clicked')
+  const handleLogout = async () => {
+    await supabase.auth.signOut()
+    toast.info('You have been signed out.')
   }
 
   // Entering a chat doesn't have to come from My Subjects specifically — Dashboard
@@ -64,47 +157,105 @@ function App() {
     setSelectedSubjectId(null)
   }
 
-  const handleSendMessage = (subjectId, content) => {
-    // TODO: replace with a Supabase insert into `messages`, then eventually a
-    // Realtime subscription instead of local state once that's wired up.
-    setSubjects((prev) =>
-      prev.map((s) => {
-        if (s.id !== subjectId) return s
-        const newMessage = {
-          id: `m-${Date.now()}`,
-          senderName: 'You',
-          senderRole: 'instructor',
-          content,
-          createdAt: new Date().toISOString(),
-          pinned: false,
-        }
-        return { ...s, messages: [...(s.messages ?? []), newMessage] }
-      })
-    )
+  const handleSendMessage = async (subjectId, content) => {
+    if (!profile?.id) return
+    
+    const newMessage = await sendMessage(subjectId, profile.id, content)
+    
+    if (newMessage) {
+      setSubjects((prev) =>
+        prev.map((s) => {
+          if (s.id !== subjectId) return s
+          return { 
+            ...s, 
+            messages: [...(s.messages ?? []), {
+              id: newMessage.id,
+              senderName: newMessage.profiles?.full_name || 'You',
+              senderRole: newMessage.profiles?.role || 'instructor',
+              content: newMessage.content,
+              createdAt: newMessage.created_at,
+              pinned: false
+            }]
+          }
+        })
+      )
+    } else {
+      toast.error('Failed to send message. Please try again.')
+    }
   }
 
-  const handleTogglePin = (subjectId, messageId) => {
-    // TODO: replace with a Supabase update on the message's `pinned` column.
-    setSubjects((prev) =>
-      prev.map((s) => {
-        if (s.id !== subjectId) return s
-        return {
-          ...s,
-          messages: s.messages.map((m) =>
-            m.id === messageId ? { ...m, pinned: !m.pinned } : m
-          ),
-        }
-      })
-    )
+  const handleTogglePin = async (subjectId, messageId) => {
+    const subject = subjects.find((s) => s.id === subjectId)
+    if (!subject) return
+
+    const message = subject.messages.find((m) => m.id === messageId)
+    if (!message) return
+
+    const newPinnedState = !message.pinned
+    const result = await toggleMessagePin(messageId, newPinnedState)
+
+    if (result) {
+      setSubjects((prev) =>
+        prev.map((s) => {
+          if (s.id !== subjectId) return s
+          return {
+            ...s,
+            messages: s.messages.map((m) =>
+              m.id === messageId ? { ...m, pinned: newPinnedState } : m
+            )
+          }
+        })
+      )
+    } else {
+      toast.error('Failed to pin message. Please try again.')
+    }
   }
 
-  const handleSaveProfile = (updated) => {
-    // TODO: replace with a Supabase update on InstructorProfiles.
-    setProfile(updated)
+  const handleSaveProfile = async (updated) => {
+    if (!profile?.id) return
+    
+    const result = await updateInstructorProfile(profile.id, {
+      full_name: updated.fullName,
+      department: updated.department,
+      avatar_url: updated.avatarUrl,
+      bio: updated.bio,
+    })
+    
+    if (result) {
+      setProfile(updated)
+      toast.success('Profile updated successfully!')
+    } else {
+      toast.error('Failed to update profile. Please try again.')
+    }
   }
 
   const currentLabel = navItems.find((item) => item.id === activePage)?.label ?? ''
   const selectedSubject = subjects.find((s) => s.id === selectedSubjectId)
+
+  if (loading) {
+    return (
+      <div className="home">
+        <div className="home__card home__card--center">
+          <p>Loading...</p>
+          {authError && <p style={{color: 'red', marginTop: '10px'}}>{authError}</p>}
+        </div>
+      </div>
+    )
+  }
+
+  if (dataLoading) {
+    return (
+      <div className="home">
+        <div className="home__card home__card--center">
+          <p>Loading instructor data...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (!session) {
+    return <Login />
+  }
 
   const renderPage = () => {
     if (selectedSubject) {
@@ -145,8 +296,8 @@ function App() {
       <div className="main-content">
         <header className="topbar">
           <div className="topbar__brand">
-            <div className="topbar__logo">NBSC</div>
-            <span className="topbar__brand-text">NBSC Instructor</span>
+            <img src={NbscLogo} alt="NBSC" className="topbar__logo-img" />
+            <span className="topbar__brand-text">NBSC Instructor Portal</span>
           </div>
 
           <h1 className="topbar__title">

@@ -1,4 +1,5 @@
 import '../styles/Dashboard.css'
+import NbscLogo from '../assets/Nbsc-logo.png'
 
 // NOTE: this replaces the copied FacebookPages directory from the student UI —
 // that was a student-facing "official college pages" list and doesn't fit the
@@ -27,6 +28,10 @@ function Dashboard({ subjects, onEnterSubject }) {
 
   return (
     <div className="dashboard">
+      <div className="dashboard__header">
+        <img src={NbscLogo} alt="NBSC" className="dashboard__logo" />
+        <h2 className="dashboard__welcome">Welcome, Instructor</h2>
+      </div>
       <div className="dashboard__summary">
         <div className="summary-card">
           <div className="summary-card__value">{activeSections.length}/{totalSections}</div>
