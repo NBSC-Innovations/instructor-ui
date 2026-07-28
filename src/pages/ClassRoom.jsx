@@ -36,6 +36,11 @@ function formatTime(iso) {
   return d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
 }
 
+function formatDate(iso) {
+  const d = new Date(iso)
+  return d.toLocaleDateString([], { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
+}
+
 // Text-only chat, per the confirmed scope (no images/video — keeps the DB light).
 // Pinning is instructor-only for now; that's a reasonable default since the
 // instructor is the one moderating the class thread, but flag it to the team if
@@ -49,9 +54,14 @@ function formatTime(iso) {
 function ClassRoom({ subject, onBack, onSendMessage, onTogglePin }) {
   const [draft, setDraft] = useState('')
   const scrollRef = useRef(null)
+  const [currentDate, setCurrentDate] = useState('')
 
   const messages = subject.messages ?? []
   const pinnedMessages = messages.filter((m) => m.pinned)
+
+  useEffect(() => {
+    setCurrentDate(formatDate(new Date()))
+  }, [])
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -76,9 +86,9 @@ function ClassRoom({ subject, onBack, onSendMessage, onTogglePin }) {
 
       <div className="classroom__header">
         <div className="classroom__code">{subject.code}</div>
-        <h2 className="classroom__name">{subject.name}</h2>
+        <h2 className="classroom__name">{subject.name !== subject.code ? subject.name : ''}</h2>
         <p className="classroom__meta">
-          {subject.section} &middot; {subject.enrolledCount} student{subject.enrolledCount === 1 ? '' : 's'}
+          {currentDate} &middot; {subject.enrolledCount} student{subject.enrolledCount === 1 ? '' : 's'}
         </p>
       </div>
 

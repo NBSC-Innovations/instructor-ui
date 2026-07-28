@@ -55,9 +55,8 @@ function LogoutIcon(props) {
 
 // eslint-disable-next-line react-refresh/only-export-components
 export const navItems = [
-  { id: 'dashboard', label: 'Dashboard', icon: DashboardIcon },
-  { id: 'my-subjects', label: 'My Subjects', icon: MySubjectsIcon },
   { id: 'group-chats', label: 'Group Chats', icon: GroupChatsIcon },
+  { id: 'my-subjects', label: 'My Subjects', icon: MySubjectsIcon },
   { id: 'profile', label: 'Profile', icon: ProfileIcon },
 ]
 

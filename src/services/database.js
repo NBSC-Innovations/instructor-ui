@@ -239,3 +239,155 @@ export async function fetchCoursesWithMessages(instructorId) {
     return []
   }
 }
+
+// Create a new section with group chat
+export async function createSection(sectionData) {
+  try {
+    // First create the section
+    const { data: section, error: sectionError } = await supabase
+      .from('sections')
+      .insert({
+        name: sectionData.sectionCode,
+        description: sectionData.subjectDescription,
+        instructor_id: sectionData.instructorId,
+        schedule: sectionData.schedule || null,
+        room: sectionData.room || null,
+        max_capacity: sectionData.maxCapacity || 40,
+        current_enrollment: 0
+      })
+      .select()
+      .single()
+
+    if (sectionError) throw sectionError
+
+    // Create a course for this section (for group chat compatibility)
+    const { data: course, error: courseError } = await supabase
+      .from('courses')
+      .insert({
+        code: sectionData.sectionCode,
+        title: sectionData.subjectDescription,
+        instructor_id: sectionData.instructorId,
+        is_active: true
+      })
+      .select()
+      .single()
+
+    if (courseError) throw courseError
+
+    // Link the section to the course
+    await supabase
+      .from('sections')
+      .update({ course_id: course.id })
+      .eq('id', section.id)
+
+    return { ...section, course_id: course.id }
+  } catch (error) {
+    console.error('Error creating section:', error)
+    return null
+  }
+}
+
+// Update an existing section
+export async function updateSection(sectionId, updates) {
+  try {
+    const { data, error } = await supabase
+      .from('sections')
+      .update(updates)
+      .eq('id', sectionId)
+      .select()
+      .single()
+
+    if (error) throw error
+    return data
+  } catch (error) {
+    console.error('Error updating section:', error.message || error)
+    return null
+  }
+}
+
+// Delete a section
+export async function deleteSection(sectionId) {
+  try {
+    const { error } = await supabase
+      .from('sections')
+      .delete()
+      .eq('id', sectionId)
+
+    if (error) throw error
+    return true
+  } catch (error) {
+    console.error('Error deleting section:', error)
+    return false
+  }
+}
+
+// Fetch all sections for an instructor (across all their courses)
+export async function fetchInstructorSections(instructorId) {
+  try {
+    const { data, error } = await supabase
+      .from('sections')
+      .select(`
+        *,
+        courses:course_id (
+          id,
+          code,
+          title
+        )
+      `)
+      .eq('instructor_id', instructorId)
+      .order('name', { ascending: true })
+
+    if (error) throw error
+    return data
+  } catch (error) {
+    console.error('Error fetching instructor sections:', error)
+    return []
+  }
+}
+
+// Fetch sections with messages for group chat display
+export async function fetchSectionsWithMessages(instructorId) {
+  try {
+    const sections = await fetchInstructorSections(instructorId)
+
+    const sectionsWithMessages = await Promise.all(
+      sections.map(async (section) => {
+        const messages = await fetchCourseMessages(section.course_id)
+        const enrolledCount = await fetchCourseEnrollmentCount(section.course_id)
+        const enrollments = await fetchCourseEnrollments(section.course_id)
+
+        return {
+          id: section.id,
+          code: section.name,
+          name: section.description || 'No description',
+          section: section.name,
+          enrolledCount: enrolledCount,
+          enrollments: enrollments.map(enrollment => ({
+            id: enrollment.id,
+            studentId: enrollment.profiles?.id,
+            fullName: enrollment.profiles?.full_name || 'Unknown',
+            email: enrollment.profiles?.email,
+            studentNumber: enrollment.profiles?.student_id,
+            role: enrollment.profiles?.role,
+            enrolledAt: enrollment.enrolled_at,
+            status: enrollment.status
+          })),
+          messages: messages.map(msg => ({
+            id: msg.id,
+            senderName: msg.profiles?.full_name || 'Unknown',
+            senderRole: msg.profiles?.role || 'student',
+            content: msg.content,
+            createdAt: msg.created_at,
+            pinned: msg.is_pinned || false
+          })),
+          courseId: section.course_id
+        }
+      })
+    )
+
+    return sectionsWithMessages
+  } catch (error) {
+    console.error('Error fetching sections with messages:', error)
+    return []
+  }
+}

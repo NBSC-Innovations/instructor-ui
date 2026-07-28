@@ -67,7 +67,9 @@ function GroupChats({ subjects, onEnterSubject }) {
             <div className="chat-row__main">
               <div className="chat-row__top">
                 <span className="chat-row__code">{subject.code}</span>
-                <span className="chat-row__section">{subject.section}</span>
+                {subject.name && subject.name !== subject.code && (
+                  <span className="chat-row__section">{subject.name}</span>
+                )}
               </div>
               <div className="chat-row__preview">
                 {subject.lastMessage

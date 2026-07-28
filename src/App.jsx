@@ -12,6 +12,8 @@ import NbscLogo from './assets/Nbsc-logo.png'
 import { 
   fetchInstructorProfile, 
   fetchCoursesWithMessages,
+  fetchSectionsWithMessages,
+  fetchInstructorCourses,
   updateInstructorProfile,
   sendMessage,
   toggleMessagePin
@@ -33,11 +35,12 @@ function App() {
   const [session, setSession] = useState(null)
   const [loading, setLoading] = useState(true)
   const [authError, setAuthError] = useState('')
-  const [activePage, setActivePage] = useState('dashboard')
+  const [activePage, setActivePage] = useState('group-chats')
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const toast = useToast()
 
   const [subjects, setSubjects] = useState([])
+  const [courses, setCourses] = useState([])
   const [selectedSubjectId, setSelectedSubjectId] = useState(null)
   const [profile, setProfile] = useState(null)
   const [dataLoading, setDataLoading] = useState(false)
@@ -65,10 +68,15 @@ function App() {
             bio: instructorProfile.bio,
           })
 
-          // Fetch courses with messages
-          const coursesData = await fetchCoursesWithMessages(instructorProfile.id)
-          console.log('[App] Courses data fetched:', coursesData)
-          setSubjects(coursesData)
+          // Fetch section-based subjects with messages
+          const sectionsData = await fetchSectionsWithMessages(instructorProfile.id)
+          console.log('[App] Sections data fetched:', sectionsData)
+          setSubjects(sectionsData)
+
+          // Fetch courses for section management
+          const instructorCourses = await fetchInstructorCourses(instructorProfile.id)
+          console.log('[App] Instructor courses fetched:', instructorCourses)
+          setCourses(instructorCourses)
         } else {
           console.log('[App] No instructor profile found for:', session.user.email)
           // Check if this is the allowed exception email
@@ -160,7 +168,10 @@ function App() {
   const handleSendMessage = async (subjectId, content) => {
     if (!profile?.id) return
     
-    const newMessage = await sendMessage(subjectId, profile.id, content)
+    const subject = subjects.find((s) => s.id === subjectId)
+    if (!subject?.courseId) return
+    
+    const newMessage = await sendMessage(subject.courseId, profile.id, content)
     
     if (newMessage) {
       setSubjects((prev) =>
@@ -229,6 +240,17 @@ function App() {
     }
   }
 
+  const handleSectionChange = async (options = {}) => {
+    if (!profile?.id) return
+    
+    // Refresh section-based subjects and courses data
+    const sectionsData = await fetchSectionsWithMessages(profile.id)
+    const instructorCourses = await fetchInstructorCourses(profile.id)
+    
+    setSubjects(sectionsData)
+    setCourses(instructorCourses)
+  }
+
   const currentLabel = navItems.find((item) => item.id === activePage)?.label ?? ''
   const selectedSubject = subjects.find((s) => s.id === selectedSubjectId)
 
@@ -273,7 +295,15 @@ function App() {
       case 'dashboard':
         return <Dashboard subjects={subjects} onEnterSubject={handleEnterSubject} />
       case 'my-subjects':
-        return <MySubjects subjects={subjects} onEnterSubject={handleEnterSubject} />
+        return (
+          <MySubjects 
+            subjects={subjects} 
+            onEnterSubject={handleEnterSubject}
+            instructorId={profile?.id}
+            courses={courses}
+            onSectionChange={handleSectionChange}
+          />
+        )
       case 'group-chats':
         return <GroupChats subjects={subjects} onEnterSubject={handleEnterSubject} />
       case 'profile':
