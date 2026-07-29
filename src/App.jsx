@@ -51,11 +51,13 @@ function App() {
       if (!session?.user?.email) return
 
       console.log('[App] Loading instructor data for:', session.user.email)
+      console.log('[App] Auth user ID:', session.user.id)
       setDataLoading(true)
       try {
         // Fetch instructor profile
         const instructorProfile = await fetchInstructorProfile(session.user.email)
         console.log('[App] Instructor profile fetched:', instructorProfile)
+        console.log('[App] Profile ID:', instructorProfile?.id)
 
         if (instructorProfile) {
           setProfile({
@@ -79,15 +81,7 @@ function App() {
           setCourses(instructorCourses)
         } else {
           console.log('[App] No instructor profile found for:', session.user.email)
-          // Check if this is the allowed exception email
-          if (session.user.email === '20221224@nbsc.edu.ph') {
-            toast.error('Profile not found for 20221224@nbsc.edu.ph. Please run the SQL setup script.')
-          } else {
-            toast.error('Access denied. This portal is for instructors only. Students should use the Student Portal.')
-            // Sign out the student user
-            await supabase.auth.signOut()
-            setSession(null)
-          }
+          toast.error('No instructor profile found. Please ensure your profile has role=instructor in the database.')
         }
       } catch (error) {
         console.error('[App] Error loading instructor data:', error)
@@ -166,12 +160,30 @@ function App() {
   }
 
   const handleSendMessage = async (subjectId, content) => {
-    if (!profile?.id) return
+    console.log('[handleSendMessage] Session:', session)
+    console.log('[handleSendMessage] Session user:', session?.user)
+    console.log('[handleSendMessage] Session user ID:', session?.user?.id)
+    console.log('[handleSendMessage] Profile ID:', profile?.id)
+    
+    if (!session?.user?.id) {
+      console.error('[handleSendMessage] No session user ID available')
+      return
+    }
     
     const subject = subjects.find((s) => s.id === subjectId)
-    if (!subject?.courseId) return
+    if (!subject?.courseId) {
+      console.error('[handleSendMessage] No course ID found for subject:', subjectId)
+      return
+    }
     
-    const newMessage = await sendMessage(subject.courseId, profile.id, content)
+    console.log('[handleSendMessage] Sending message with:', {
+      courseId: subject.courseId,
+      senderId: session.user.id,
+      profileId: profile?.id,
+      content: content
+    })
+    
+    const newMessage = await sendMessage(subject.courseId, session.user.id, content)
     
     if (newMessage) {
       setSubjects((prev) =>

@@ -324,7 +324,11 @@ function MySubjects({ subjects, onEnterSubject, instructorId, courses, onSection
                     <div className="my-subjects__section-course">{section.description}</div>
                   )}
                   {section.schedule && (
-                    <div className="my-subjects__section-meta">{section.schedule}</div>
+                    <div className="my-subjects__section-meta">
+                      {typeof section.schedule === 'object' 
+                        ? `${section.schedule.days?.join(', ') || ''} ${section.schedule.time || ''}`.trim()
+                        : section.schedule}
+                    </div>
                   )}
                   {section.room && (
                     <div className="my-subjects__section-meta">Room: {section.room}</div>

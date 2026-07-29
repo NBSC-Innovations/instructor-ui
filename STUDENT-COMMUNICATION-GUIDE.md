@@ -6,7 +6,7 @@ This guide explains how students can communicate within the NBSC Group Chat Find
 
 ## Overview
 
-The communication system is designed to facilitate seamless interaction between instructors and students within course sections. Each course section has its own dedicated group chat that is automatically created when students are enrolled.
+The communication system is designed to facilitate seamless interaction between instructors and students within course sections. Each section has its own dedicated group chat that is automatically created when the section is created by the instructor.
 
 ---
 
@@ -16,48 +16,59 @@ The communication system is designed to facilitate seamless interaction between 
 
 Instructors see group chats in three main locations:
 
-1. **Dashboard**: Shows a summary of active sections and the 3 most recent chats with message previews
+1. **Dashboard**: Now displays the Group Chats page as the default view, showing all active conversations sorted by most recent message
 2. **My Subjects**: Lists all assigned sections with their enrollment status:
    - Sections with `enrolledCount > 0`: Shows "Enter" button to access the active chat
    - Sections with `enrolledCount === 0`: Shows "Waiting for students" (chat not yet created)
+   - Section Management: Dedicated section for creating, editing, and deleting sections with section codes and descriptions
 3. **Group Chats**: Dedicated view showing all active conversations, sorted by most recent message
 
 ### Chat Creation Logic
 
-- **Automatic creation**: A group chat is automatically created when a course is created in the database
-- **Instructor auto-join**: When a course is created, the instructor is automatically added as a member of the group chat
-- **Student auto-join**: When a student enrolls in a course with status='active', they are automatically added to the group chat
-- **No manual setup**: Instructors do not need to manually create chats or add students - everything is handled by database triggers
-- **Real-time sync**: When a student enrolls, the chat immediately becomes visible to the instructor via the enrollment trigger
+- **Section-based chats**: Group chats are now created per section instead of per course
+- **Manual section creation**: Instructors create sections manually with section codes (e.g., "BSIT 3A") and subject descriptions
+- **Automatic course creation**: When a section is created, a corresponding course is automatically created for group chat compatibility
+- **Instructor auto-join**: When a section is created, the instructor is automatically added as a member of the group chat
+- **Student auto-join**: When a student matches a section code on the student side, they are automatically added to the corresponding group chat
+- **No manual chat setup**: Instructors do not need to manually create chats - everything is handled when sections are created
+- **Real-time sync**: When a student joins a section, the chat immediately becomes visible to the instructor
 
 ### Database Implementation
 
 The group chat system uses the following database tables and triggers:
 
 **Tables:**
-- **group_chats**: Stores one chat per course (linked via `course_id`)
-- **group_chat_members**: Tracks membership (links users to chats via `group_chat_id` and `user_id`)
+- **sections**: Stores section information including section code, description, schedule, room, and capacity
+- **courses**: Stores course information (automatically created when sections are created)
+- **enrollments**: Tracks student enrollment in courses
 - **gc_messages**: Stores all messages (linked to course via `course_id`)
 
-**Automatic Triggers:**
-1. **Course Creation Trigger**: When a course is created, a group chat is automatically created with the name `{course_code} - {course_title}`, and the instructor is added as a member
-2. **Enrollment Trigger**: When a student enrolls with status='active', they are automatically added to the corresponding course's group chat
+**Section Creation Process:**
+1. **Manual Section Creation**: Instructors create sections via a modal form with:
+   - Section Code (e.g., "BSIT 3A")
+   - Subject Description (e.g., "System Integration and Architecture")
+   - Schedule (optional)
+   - Room (optional)
+   - Max Capacity (default: 40)
+2. **Automatic Course Creation**: When a section is created, a corresponding course is automatically created with the same code and description
+3. **Section-Course Link**: The section is linked to the course for group chat compatibility
 
 This ensures that:
-- Every course has exactly one group chat
-- Instructors are automatically members of their course chats
-- Students are automatically added when they enroll
+- Every section has exactly one group chat (via the linked course)
+- Instructors can manage sections independently
+- Students can join by matching section codes
 - No manual chat management is required
 
 ### Instructor Chat Features
 
-When an instructor enters a course chat (ClassRoom view), they can:
+When an instructor enters a section chat (ClassRoom view), they can:
 
 - **View all messages**: See the complete conversation history with student names and timestamps
 - **Send messages**: Post announcements, answer questions, share links
 - **Pin messages**: Mark important messages as pinned (instructor-only feature) - these appear at the top of the chat for all participants
 - **See enrollment count**: View how many students are in the section
 - **Navigate back**: Return to the list of chats or subjects
+- **View section details**: Chat header displays section code, subject description, and current date
 
 ### Message Visibility
 
@@ -92,8 +103,9 @@ Students can access their course group chats through:
 
 ### 4. **Chat Organization**
 
-- **Course-based**: Each course section has its own dedicated chat
-- **Automatic enrollment**: Students are automatically added to chats when enrolled in a section
+- **Section-based**: Each section has its own dedicated group chat
+- **Section code matching**: Students join chats by matching section codes entered by instructors
+- **Automatic enrollment**: Students are automatically added to chats when they match a section code
 - **Active vs waiting**: Chats appear as "active" once students are enrolled
 
 ---
@@ -110,7 +122,7 @@ Students can access their course group chats through:
 | **Timestamps** | ✅ | ✅ | Time sent on each message |
 | **Link sharing** | ✅ | ✅ | Paste external links |
 | **Real-time updates** | ✅ | ✅ | Via Supabase Realtime |
-| **Course-based chats** | ✅ | ✅ | One chat per section |
+| **Section-based chats** | ✅ | ✅ | One chat per section |
 
 ### Message Management
 
@@ -126,8 +138,9 @@ Students can access their course group chats through:
 
 | Feature | Instructor | Student | Notes |
 |---------|-----------|---------|-------|
-| **Dashboard overview** | ✅ | ✅ | Summary of active chats |
-| **My Subjects list** | ✅ | ✅ | All enrolled/assigned courses |
+| **Dashboard overview** | ✅ | ✅ | Shows Group Chats as default view |
+| **My Subjects list** | ✅ | ✅ | All enrolled/assigned sections |
+| **Section Management** | ✅ | ❌ | Create/edit/delete sections (instructor-only) |
 | **Group Chats view** | ✅ | ✅ | Sorted by recent activity |
 | **Quick access to recent** | ✅ | ✅ | Most recent conversations |
 
@@ -153,10 +166,12 @@ Students can access their course group chats through:
 
 ### For Instructors
 
-1. **Pin important updates**: Use pinning for announcements, deadlines, and critical information
-2. **Set expectations**: Communicate response times and preferred communication channels
-3. **Moderate discussions**: Keep conversations focused and productive
-4. **Share external links**: Use the chat to direct students to external platforms (Facebook groups, Messenger, etc.)
+1. **Create sections properly**: Use descriptive section codes and subject descriptions to help students identify their correct sections
+2. **Pin important updates**: Use pinning for announcements, deadlines, and critical information
+3. **Set expectations**: Communicate response times and preferred communication channels
+4. **Moderate discussions**: Keep conversations focused and productive
+5. **Share external links**: Use the chat to direct students to external platforms (Facebook groups, Messenger, etc.)
+6. **Manage sections**: Regularly review and update section information (schedule, room, capacity)
 
 ---
 
@@ -166,9 +181,10 @@ Students can access their course group chats through:
 
 Both instructor and student interfaces share the same database tables:
 
+- **sections**: Stores section information (code, description, schedule, room, capacity)
+- **courses**: Stores course information (automatically created from sections)
+- **enrollments**: Tracks student enrollment in courses
 - **gc_messages**: Stores all chat messages with sender information
-- **group_chats**: Represents each course's group chat
-- **group_chat_members**: Tracks membership in each chat
 - **profiles**: User information for both instructors and students
 
 ### Real-time Updates
@@ -231,11 +247,13 @@ Both interfaces should:
 
 ## Summary
 
-The communication system is designed to be **symmetrical** between instructor and student interfaces, with role-specific features (like instructor-only pinning) where appropriate. The core messaging functionality—sending, receiving, and viewing messages—should behave identically on both sides to ensure a consistent user experience.
+The communication system is designed to be **symmetrical** between instructor and student interfaces, with role-specific features (like instructor-only section management and pinning) where appropriate. The core messaging functionality—sending, receiving, and viewing messages—should behave identically on both sides to ensure a consistent user experience.
 
 Key principles:
-- **Automatic chat creation**: Chats are generated when students enroll
+- **Section-based chats**: Chats are generated when instructors create sections
+- **Manual section creation**: Instructors create sections with codes and descriptions
+- **Section code matching**: Students join by matching section codes
 - **Text-first approach**: Keep the database light with text-only messaging
 - **Real-time sync**: Both sides receive updates instantly
-- **Role-based permissions**: Instructors have moderation tools, students have participation tools
+- **Role-based permissions**: Instructors have section management and moderation tools, students have participation tools
 - **Shared infrastructure**: Same database, same real-time system, same design language

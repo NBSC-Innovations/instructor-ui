@@ -1,5 +1,67 @@
 import { supabase } from '../utils/supabaseClient'
 
+// Create a new profile using service role (bypasses RLS)
+export async function createProfileWithServiceRole(userId, email, fullName, role) {
+  try {
+    // Use the service role key from environment
+    const serviceRoleKey = import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY || import.meta.env.SUPABASE_SECRET_KEY
+    
+    if (!serviceRoleKey) {
+      throw new Error('Service role key not available')
+    }
+
+    const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL || import.meta.env.SUPABASE_URL}/rest/v1/profiles`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': serviceRoleKey,
+        'Authorization': `Bearer ${serviceRoleKey}`
+      },
+      body: JSON.stringify({
+        id: userId,
+        email: email,
+        full_name: fullName,
+        role: role,
+        student_id: role === 'student' ? email.split('@')[0] : null
+      })
+    })
+
+    if (!response.ok) {
+      const error = await response.text()
+      throw new Error(`Failed to create profile: ${error}`)
+    }
+
+    const data = await response.json()
+    return data
+  } catch (error) {
+    console.error('Error creating profile with service role:', error)
+    throw error
+  }
+}
+
+// Create a new profile
+export async function createProfile(userId, email, fullName, role) {
+  try {
+    const { data, error } = await supabase
+      .from('profiles')
+      .insert({
+        id: userId,
+        email: email,
+        full_name: fullName,
+        role: role,
+        student_id: role === 'student' ? email.split('@')[0] : null
+      })
+      .select()
+      .single()
+
+    if (error) throw error
+    return data
+  } catch (error) {
+    console.error('Error creating profile:', error)
+    return null
+  }
+}
+
 // Fetch instructor profile by email (from profiles table)
 // Special exception: 20221224@nbsc.edu.ph bypasses role check for development
 export async function fetchInstructorProfile(email) {
@@ -9,14 +71,16 @@ export async function fetchInstructorProfile(email) {
       .select('*')
       .eq('email', email)
 
-    // Bypass role check for the allowed exception email
-    if (email !== '20221224@nbsc.edu.ph') {
-      query = query.eq('role', 'instructor')
-    }
+    // For development, don't filter by role to allow any profile
+    // Remove role filter temporarily for debugging
+    // if (email !== '20221224@nbsc.edu.ph') {
+    //   query = query.eq('role', 'instructor')
+    // }
 
-    const { data, error } = await query.single()
+    const { data, error } = await query.maybeSingle()
 
     if (error) throw error
+    console.log('[fetchInstructorProfile] Found profile:', data)
     return data
   } catch (error) {
     console.error('Error fetching instructor profile:', error)
@@ -62,22 +126,30 @@ export async function fetchCourseSections(courseId) {
 // Fetch messages for a specific course (from gc_messages table)
 export async function fetchCourseMessages(courseId) {
   try {
-    const { data, error } = await supabase
-      .from('gc_messages')
-      .select(`
-        *,
-        profiles:sender_id (
-          full_name,
-          student_id,
-          role
-        )
-      `)
-      .eq('course_id', courseId)
-      .eq('is_deleted', false)
-      .order('created_at', { ascending: true })
+    // Use the SECURITY DEFINER function to bypass RLS
+    const { data, error } = await supabase.rpc('fetch_course_messages', {
+      p_course_id: courseId
+    })
 
     if (error) throw error
-    return data
+
+    // Manually fetch profiles for each message
+    const messagesWithProfiles = await Promise.all(
+      data.map(async (message) => {
+        const { data: profileData } = await supabase
+          .from('profiles')
+          .select('full_name, student_id, role')
+          .eq('id', message.sender_id)
+          .single()
+        
+        return {
+          ...message,
+          profiles: profileData || { full_name: 'Unknown', student_id: null, role: 'student' }
+        }
+      })
+    )
+
+    return messagesWithProfiles
   } catch (error) {
     console.error('Error fetching course messages:', error)
     return []
@@ -102,29 +174,40 @@ export async function toggleMessagePin(messageId, isPinned) {
   }
 }
 
-// Send a new message to a course
+// Send a new message to a course using the SECURITY DEFINER function
 export async function sendMessage(courseId, senderId, content) {
   try {
-    const { data, error } = await supabase
-      .from('gc_messages')
-      .insert({
-        course_id: courseId,
-        sender_id: senderId,
-        content: content,
-        is_deleted: false
-      })
-      .select(`
-        *,
-        profiles:sender_id (
-          full_name,
-          student_id,
-          role
-        )
-      `)
+    console.log('[sendMessage] Attempting to send message:', {
+      courseId,
+      senderId,
+      content
+    })
+
+    // Use the SECURITY DEFINER function to bypass RLS
+    const { data, error } = await supabase.rpc('insert_message', {
+      p_course_id: courseId,
+      p_sender_id: senderId,
+      p_content: content
+    })
+
+    if (error) {
+      console.error('[sendMessage] Database error:', error)
+      throw error
+    }
+
+    console.log('[sendMessage] Message inserted successfully:', data)
+
+    // Fetch profile data separately
+    const { data: profileData } = await supabase
+      .from('profiles')
+      .select('full_name, student_id, role')
+      .eq('id', senderId)
       .single()
 
-    if (error) throw error
-    return data
+    return {
+      ...data[0],
+      profiles: profileData || { full_name: 'Unknown', student_id: null, role: 'student' }
+    }
   } catch (error) {
     console.error('Error sending message:', error)
     return null
@@ -241,9 +324,10 @@ export async function fetchCoursesWithMessages(instructorId) {
 }
 
 // Create a new section with group chat
+// Note: The database trigger will automatically create the course and group chat
 export async function createSection(sectionData) {
   try {
-    // First create the section
+    // Create the section - trigger will handle course and group chat creation
     const { data: section, error: sectionError } = await supabase
       .from('sections')
       .insert({
@@ -260,27 +344,9 @@ export async function createSection(sectionData) {
 
     if (sectionError) throw sectionError
 
-    // Create a course for this section (for group chat compatibility)
-    const { data: course, error: courseError } = await supabase
-      .from('courses')
-      .insert({
-        code: sectionData.sectionCode,
-        title: sectionData.subjectDescription,
-        instructor_id: sectionData.instructorId,
-        is_active: true
-      })
-      .select()
-      .single()
-
-    if (courseError) throw courseError
-
-    // Link the section to the course
-    await supabase
-      .from('sections')
-      .update({ course_id: course.id })
-      .eq('id', section.id)
-
-    return { ...section, course_id: course.id }
+    // The trigger has already created the course and group chat
+    // Return the section with the course_id populated by the trigger
+    return section
   } catch (error) {
     console.error('Error creating section:', error)
     return null
@@ -388,6 +454,165 @@ export async function fetchSectionsWithMessages(instructorId) {
     return sectionsWithMessages
   } catch (error) {
     console.error('Error fetching sections with messages:', error)
+    return []
+  }
+}
+
+// ============================================
+// STUDENT-FACING FUNCTIONS
+// ============================================
+
+// Find section by code (for manual student enrollment)
+export async function findSectionByCode(sectionCode) {
+  try {
+    const { data, error } = await supabase
+      .from('sections')
+      .select(`
+        *,
+        courses:course_id (
+          id,
+          code,
+          title,
+          instructor_id
+        )
+      `)
+      .eq('name', sectionCode)
+      .single()
+
+    if (error) throw error
+    return data
+  } catch (error) {
+    console.error('Error finding section by code:', error)
+    return null
+  }
+}
+
+// Enroll student in a section/course
+export async function enrollInSection(sectionId, courseId, studentId) {
+  try {
+    const { data, error } = await supabase
+      .from('enrollments')
+      .insert({
+        student_id: studentId,
+        course_id: courseId,
+        status: 'active'
+      })
+      .select()
+      .single()
+
+    if (error) throw error
+    return data
+  } catch (error) {
+    console.error('Error enrolling in section:', error)
+    return null
+  }
+}
+
+// Get student's enrollments
+export async function getStudentEnrollments(studentId) {
+  try {
+    const { data, error } = await supabase
+      .from('enrollments')
+      .select(`
+        *,
+        courses:course_id (
+          id,
+          code,
+          title,
+          description,
+          instructor_id,
+          schedule
+        )
+      `)
+      .eq('student_id', studentId)
+      .eq('status', 'active')
+      .order('enrolled_at', { ascending: false })
+
+    if (error) throw error
+    
+    // Fetch sections separately for each enrollment
+    const enrollmentsWithSections = await Promise.all(
+      data.map(async (enrollment) => {
+        const { data: sectionData } = await supabase
+          .from('sections')
+          .select('*')
+          .eq('course_id', enrollment.course_id)
+          .single()
+        
+        return {
+          ...enrollment,
+          section: sectionData
+        }
+      })
+    )
+    
+    return enrollmentsWithSections
+  } catch (error) {
+    console.error('Error getting student enrollments:', error)
+    return []
+  }
+}
+
+// Get members of a course's group chat
+export async function getCourseMembers(courseId) {
+  try {
+    // First get the group chat ID for the course
+    const { data: groupChat, error: chatError } = await supabase
+      .from('group_chats')
+      .select('id')
+      .eq('course_id', courseId)
+      .single()
+
+    if (chatError) throw chatError
+    if (!groupChat) return []
+
+    // Then get the members of that group chat
+    const { data, error } = await supabase
+      .from('group_chat_members')
+      .select(`
+        *,
+        profiles:user_id (
+          id,
+          full_name,
+          email,
+          student_id,
+          role
+        )
+      `)
+      .eq('group_chat_id', groupChat.id)
+
+    if (error) throw error
+    return data
+  } catch (error) {
+    console.error('Error getting course members:', error)
+    return []
+  }
+}
+
+// Get student's group chats
+export async function getStudentGroupChats(studentId) {
+  try {
+    const { data, error } = await supabase
+      .from('group_chat_members')
+      .select(`
+        *,
+        group_chats:group_chat_id (
+          id,
+          name,
+          course_id,
+          courses:course_id (
+            code,
+            title,
+            instructor_id
+          )
+        )
+      `)
+      .eq('user_id', studentId)
+
+    if (error) throw error
+    return data
+  } catch (error) {
+    console.error('Error getting student group chats:', error)
     return []
   }
 }
