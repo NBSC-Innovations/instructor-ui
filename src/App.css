@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 .counter {
   font-size: 16px;
   padding: 5px 10px;
@@ -180,5 +181,131 @@
   &::after {
     right: 0;
     border-right-color: var(--border);
+=======
+.app-layout {
+  display: flex;
+  min-height: 100vh;
+  background: var(--bg-app);
+}
+
+.main-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  margin-left: 260px;
+  transition: margin-left 0.28s ease;
+}
+
+.topbar {
+  height: 64px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 0 28px;
+  background: #0F2854;
+  border-bottom: none;
+  position: sticky;
+  top: 0;
+  z-index: 20;
+}
+
+.topbar__brand {
+  display: none;
+  align-items: center;
+  gap: 10px;
+}
+
+.topbar__logo {
+  width: 30px;
+  height: 30px;
+  flex-shrink: 0;
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.15);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 9px;
+  letter-spacing: 0.3px;
+}
+
+.topbar__brand-text {
+  font-size: 16px;
+  font-weight: 600;
+  color: #fff;
+  white-space: nowrap;
+}
+
+.topbar__title {
+  font-size: 18px;
+  font-weight: 600;
+  color: #fff;
+  margin: 0;
+  flex: 1;
+}
+
+.topbar__burger {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 8px;
+  background: transparent;
+  color: #fff;
+  cursor: pointer;
+  flex-shrink: 0;
+  order: 3;
+}
+
+.topbar__burger:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.content-area {
+  flex: 1;
+  padding: 28px;
+  display: flex;
+  justify-content: center;
+}
+
+/* Keeps content at a comfortable reading width on wide desktop monitors instead of
+   stretching cards/chat bubbles edge-to-edge. Pages that want to use the full
+   available width (rare) can override with a width:100% wrapper of their own. */
+.page-container {
+  width: 100%;
+  max-width: 1180px;
+}
+
+@media (max-width: 1024px) {
+  .main-content {
+    margin-left: 0;
+  }
+
+  .topbar {
+    padding: 0 16px;
+  }
+
+  .topbar__brand {
+    display: flex;
+    order: 1;
+  }
+
+  .topbar__title {
+    display: none;
+  }
+
+  .topbar__burger {
+    display: flex;
+    order: 2;
+    margin-left: auto;
+  }
+
+  .content-area {
+    padding: 18px;
+>>>>>>> development-backup
   }
 }

@@ -1,4 +1,5 @@
 :root {
+<<<<<<< HEAD
   --text: #6b6375;
   --text-h: #08060d;
   --bg: #fff;
@@ -20,10 +21,37 @@
   color-scheme: light dark;
   color: var(--text);
   background: var(--bg);
+=======
+  /* NBSC theme — matched to navy topbar */
+  --nbsc-blue-900: #0a1c3d;
+  --nbsc-blue-800: #0F2854;   /* same as topbar */
+  --nbsc-blue-700: #16376f;
+  --nbsc-blue-600: #1c4589;
+  --nbsc-blue-500: #0F2854;   /* was #2563eb — now matches topbar navy */
+  --nbsc-blue-100: #e8ecf5;
+  --nbsc-blue-100-hover: #dbe2f0;
+
+  --nbsc-gradient: linear-gradient(135deg, #0a1c3d 0%, #0F2854 60%, #16376f 100%);
+
+  --text: #4b5563;
+  --text-h: #0f1f33;
+  --bg-app: #f5f8fc;
+  --bg: #fff;
+  --border: #e2e8f0;
+
+  --sans: system-ui, 'Segoe UI', Roboto, sans-serif;
+  --heading: system-ui, 'Segoe UI', Roboto, sans-serif;
+
+  font: 15.5px/145% var(--sans);
+  color-scheme: light;
+  color: var(--text);
+  background: var(--bg-app);
+>>>>>>> development-backup
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+<<<<<<< HEAD
 
   @media (max-width: 1024px) {
     font-size: 16px;
@@ -48,6 +76,12 @@
   #social .button-icon {
     filter: invert(1) brightness(2);
   }
+=======
+}
+
+* {
+  box-sizing: border-box;
+>>>>>>> development-backup
 }
 
 body {
@@ -55,6 +89,7 @@ body {
 }
 
 #root {
+<<<<<<< HEAD
   width: 1126px;
   max-width: 100%;
   margin: 0 auto;
@@ -108,4 +143,259 @@ code {
   line-height: 135%;
   padding: 4px 8px;
   background: var(--code-bg);
+=======
+  min-height: 100svh;
+}
+
+h1, h2, h3 {
+  font-family: var(--heading);
+  font-weight: 600;
+  color: var(--text-h);
+  margin: 0;
+}
+
+/* ════════════════════════════════════════
+   TOAST NOTIFICATIONS
+   ════════════════════════════════════════ */
+
+.toast-list {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  pointer-events: none;
+}
+
+.toast {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 13px 16px;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.4;
+  min-width: 280px;
+  max-width: 380px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.14);
+  pointer-events: auto;
+  cursor: default;
+  /* start hidden & shifted down */
+  opacity: 0;
+  transform: translateY(12px);
+  transition: opacity 0.28s ease, transform 0.28s ease;
+}
+
+.toast--visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.toast--success {
+  background: #f0fdf4;
+  border: 1px solid #86efac;
+  color: #166534;
+}
+
+.toast--error {
+  background: #fef2f2;
+  border: 1px solid #fca5a5;
+  color: #991b1b;
+}
+
+.toast--info {
+  background: #eff6ff;
+  border: 1px solid #93c5fd;
+  color: #1e40af;
+}
+
+.toast__icon {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+}
+
+.toast--success .toast__icon { background: #dcfce7; color: #16a34a; }
+.toast--error   .toast__icon { background: #fee2e2; color: #dc2626; }
+.toast--info    .toast__icon { background: #dbeafe; color: #2563eb; }
+
+.toast__msg {
+  flex: 1;
+}
+
+.toast__close {
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: inherit;
+  opacity: 0.5;
+  padding: 2px;
+  display: flex;
+  align-items: center;
+  border-radius: 4px;
+  transition: opacity 0.15s;
+}
+
+.toast__close:hover {
+  opacity: 1;
+}
+
+@media (max-width: 480px) {
+  .toast-list {
+    bottom: 16px;
+    right: 12px;
+    left: 12px;
+  }
+
+  .toast {
+    min-width: unset;
+    max-width: unset;
+    width: 100%;
+  }
+}
+
+/* ════════════════════════════════════════
+   APP LAYOUT
+   ════════════════════════════════════════ */
+
+.app-layout {
+  display: flex;
+  min-height: 100vh;
+  background: var(--bg-app);
+}
+
+.main-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 24px;
+  background: var(--nbsc-blue-800);
+  color: white;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.topbar__brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.topbar__logo-img {
+  height: 40px;
+  width: auto;
+}
+
+.topbar__brand-text {
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.topbar__title {
+  font-size: 20px;
+  font-weight: 600;
+  margin: 0;
+}
+
+.topbar__profile {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.topbar__avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--nbsc-blue-600);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-weight: 600;
+  font-size: 16px;
+  overflow: hidden;
+}
+
+.topbar__avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.topbar__user-info {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+
+.topbar__user-name {
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.topbar__user-email {
+  font-size: 12px;
+  opacity: 0.8;
+}
+
+.topbar__logout-btn {
+  padding: 8px 16px;
+  background: var(--nbsc-blue-600);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: background 0.2s;
+}
+
+.topbar__logout-btn:hover {
+  background: var(--nbsc-blue-700);
+}
+
+.content-area {
+  flex: 1;
+  padding: 24px;
+  overflow-y: auto;
+}
+
+.dashboard {
+  background: white;
+  border-radius: 12px;
+  padding: 32px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.home {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-app);
+}
+
+.home__card {
+  background: white;
+  border-radius: 12px;
+  padding: 32px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.home__card--center {
+  text-align: center;
+>>>>>>> development-backup
 }

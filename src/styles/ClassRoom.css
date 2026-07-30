@@ -1,0 +1,224 @@
+.classroom {
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 64px - 56px);
+  max-height: 780px;
+}
+
+.classroom__back {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: transparent;
+  border: none;
+  color: #64748b;
+  font-size: 13.5px;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  padding: 0;
+  margin-bottom: 14px;
+  flex-shrink: 0;
+}
+
+.classroom__back:hover {
+  color: var(--nbsc-blue-700);
+}
+
+.classroom__header {
+  margin-bottom: 12px;
+  flex-shrink: 0;
+}
+
+.classroom__code {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--nbsc-blue-500);
+  letter-spacing: 0.3px;
+}
+
+.classroom__name {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text-h);
+  margin: 2px 0 4px;
+}
+
+.classroom__meta {
+  font-size: 13.5px;
+  color: #64748b;
+  margin: 0;
+}
+
+.classroom__pinned {
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  border-radius: 10px;
+  padding: 10px 14px;
+  margin-bottom: 12px;
+  flex-shrink: 0;
+}
+
+.classroom__pinned-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #92400e;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  margin-bottom: 6px;
+}
+
+.classroom__pinned-item {
+  font-size: 13.5px;
+  color: #78350f;
+  line-height: 1.5;
+}
+
+.classroom__pinned-sender {
+  font-weight: 600;
+}
+
+.classroom__chat {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.classroom__messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.classroom__empty {
+  color: #94a3b8;
+  font-size: 14px;
+  text-align: center;
+  margin: auto 0;
+}
+
+.chat-message {
+  display: flex;
+}
+
+.chat-message--instructor {
+  justify-content: flex-end;
+}
+
+.chat-message--student {
+  justify-content: flex-start;
+}
+
+.chat-message__bubble {
+  max-width: min(70%, 520px);
+  padding: 9px 12px;
+  border-radius: 12px;
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.chat-message--instructor .chat-message__bubble {
+  background: var(--nbsc-blue-500);
+  color: #fff;
+  border-bottom-right-radius: 3px;
+}
+
+.chat-message--student .chat-message__bubble {
+  background: #f1f5f9;
+  color: var(--text-h);
+  border-bottom-left-radius: 3px;
+}
+
+.chat-message__sender {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--nbsc-blue-600);
+  margin-bottom: 2px;
+}
+
+.chat-message__content {
+  word-break: break-word;
+}
+
+.chat-message__footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.chat-message__time {
+  font-size: 10.5px;
+  opacity: 0.7;
+}
+
+.chat-message__pin {
+  background: transparent;
+  border: none;
+  padding: 2px;
+  cursor: pointer;
+  opacity: 0.5;
+  display: flex;
+  color: inherit;
+}
+
+.chat-message__pin:hover {
+  opacity: 1;
+}
+
+.chat-message__pin--active {
+  opacity: 1;
+  color: #f59e0b;
+}
+
+.classroom__composer {
+  display: flex;
+  gap: 8px;
+  padding: 12px 14px;
+  border-top: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.classroom__composer input {
+  flex: 1;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 10px 16px;
+  font-size: 14px;
+  font-family: inherit;
+  outline: none;
+}
+
+.classroom__composer input:focus {
+  border-color: var(--nbsc-blue-500);
+}
+
+.classroom__send {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  border: none;
+  background: var(--nbsc-blue-500);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.classroom__send:hover {
+  opacity: 0.9;
+}
