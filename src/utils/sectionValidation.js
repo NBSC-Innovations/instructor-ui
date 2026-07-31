@@ -1,21 +1,17 @@
-/**
- * Normalizes hand-typed course codes / section names so
- * "ics001" / "ICS001 " / " ICS001" all match the same catalog row,
- * and so we're not creating near-duplicate rows from formatting noise.
- */
 export function normalizeCode(value) {
-  return (value || '').trim().replace(/\s+/g, ' ');
+  return (value || '').trim().replace(/\s+/g, ' ').toUpperCase();
 }
 
-export function isValidSectionRow({ courseCode, sectionName }) {
-  const code = normalizeCode(courseCode);
-  const name = normalizeCode(sectionName);
-  const errors = {};
+export function isValidCode(code) {
+  const c = normalizeCode(code);
+  if (!c) return { valid: false, error: 'Section code is required.' };
+  if (c.length > 20) return { valid: false, error: 'That looks too long for a section code — check for a typo.' };
+  return { valid: true, error: null };
+}
 
-  if (!code) errors.courseCode = 'Course code is required.';
-  if (!name) errors.sectionName = 'Section is required.';
-  if (code && code.length > 20) errors.courseCode = 'Course code looks too long — check for a typo.';
-  if (name && name.length > 30) errors.sectionName = 'Section looks too long — check for a typo.';
-
-  return { valid: Object.keys(errors).length === 0, errors };
+export function isValidTitle(title) {
+  const t = (title || '').trim();
+  if (!t) return { valid: false, error: 'Subject title is required for a new section.' };
+  if (t.length > 120) return { valid: false, error: 'Title looks too long — check for a typo.' };
+  return { valid: true, error: null };
 }

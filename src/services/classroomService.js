@@ -2,11 +2,16 @@ import { supabase } from '../utils/supabaseClient';
 import { normalizeCode } from '../utils/sectionValidation';
 
 /**
- * There is no separate "classroom" or "group chat" table to create.
- * A section IS the classroom, and gc_messages references section_id
- * directly — so "the chat" always exists the instant the section row
- * does, with zero messages until someone sends one. Claiming or
- * creating a section is the entire job here; nothing else to spin up.
+ * Matches the LIVE data shape confirmed from an actual Supabase export:
+ * sections.name holds the code itself (e.g. "ICS79"), sections.description
+ * holds the human-readable subject title, and course_id is nullable and
+ * currently unused by every existing row — there is no courses-table join
+ * in this flow. If the courses table gets properly wired in later, this
+ * file is the one place that needs to change.
+ *
+ * There is also no separate "classroom" or "group chat" entity — gc_messages
+ * references section_id directly, so creating/claiming the section row is
+ * the entire job here.
  */
 
 export async function suggestSections(query) {
@@ -15,8 +20,8 @@ export async function suggestSections(query) {
 
   const { data, error } = await supabase
     .from('sections')
-    .select('id, name, instructor_id, courses ( code, title )')
-    .or(`name.ilike.%${q}%,courses.code.ilike.%${q}%`)
+    .select('id, name, description, instructor_id')
+    .ilike('name', `%${q}%`)
     .limit(5);
 
   if (error) {
@@ -26,41 +31,29 @@ export async function suggestSections(query) {
   return data || [];
 }
 
-export async function resolveSection(courseCode, sectionName) {
-  const code = normalizeCode(courseCode);
-  const name = normalizeCode(sectionName);
+export async function resolveSectionByCode(code) {
+  const normalized = normalizeCode(code);
 
-  const { data: course, error: courseErr } = await supabase
-    .from('courses')
-    .select('id, code, title')
-    .ilike('code', code)
-    .maybeSingle();
-  if (courseErr) throw courseErr;
-
-  if (!course) {
-    return { status: 'not_found', courseCode: code, sectionName: name };
-  }
-
-  const { data: section, error: sectionErr } = await supabase
+  const { data: section, error } = await supabase
     .from('sections')
-    .select('id, name, instructor_id')
-    .eq('course_id', course.id)
-    .ilike('name', name)
+    .select('id, name, description, instructor_id')
+    .ilike('name', normalized)
     .maybeSingle();
-  if (sectionErr) throw sectionErr;
+
+  if (error) throw error;
 
   if (!section) {
-    return { status: 'not_found', courseCode: code, sectionName: name, course };
+    return { status: 'not_found', code: normalized };
   }
   if (!section.instructor_id) {
-    return { status: 'unclaimed', section, course };
+    return { status: 'unclaimed', section };
   }
 
   const { data: { user } } = await supabase.auth.getUser();
   if (section.instructor_id === user?.id) {
-    return { status: 'already_yours', section, course };
+    return { status: 'already_yours', section };
   }
-  return { status: 'taken', section, course };
+  return { status: 'taken', section };
 }
 
 export async function claimSection(sectionId) {
@@ -69,7 +62,7 @@ export async function claimSection(sectionId) {
     .from('sections')
     .update({ instructor_id: user.id })
     .eq('id', sectionId)
-    .is('instructor_id', null)
+    .is('instructor_id', null) // matches the sections_claim_unassigned RLS policy
     .select()
     .single();
   if (error) throw error;
@@ -77,36 +70,21 @@ export async function claimSection(sectionId) {
 }
 
 /**
- * Explicit create — call only after the UI has confirmed with the
- * instructor that resolveSection() returned 'not_found' and they
- * still want to proceed. Creates the course row too if it's new.
+ * Explicit create — call only after the UI confirms resolveSectionByCode()
+ * returned 'not_found' and the instructor supplied a title. course_id is
+ * intentionally omitted (left null), matching every existing row.
  */
-export async function createSection(courseCode, courseTitle, sectionName) {
-  const code = normalizeCode(courseCode);
-  const name = normalizeCode(sectionName);
-
-  let { data: course } = await supabase
-    .from('courses')
-    .select('id')
-    .ilike('code', code)
-    .maybeSingle();
-
-  if (!course) {
-    const { data: newCourse, error: courseErr } = await supabase
-      .from('courses')
-      .insert({ code, title: courseTitle || code })
-      .select()
-      .single();
-    if (courseErr) throw courseErr;
-    course = newCourse;
-  }
-
+export async function createSection(code, title) {
   const { data: { user } } = await supabase.auth.getUser();
-  const { data: section, error: sectionErr } = await supabase
+  const { data: section, error } = await supabase
     .from('sections')
-    .insert({ course_id: course.id, name, instructor_id: user.id })
+    .insert({
+      name: normalizeCode(code),
+      description: title.trim(),
+      instructor_id: user.id,
+    })
     .select()
     .single();
-  if (sectionErr) throw sectionErr;
+  if (error) throw error;
   return section;
 }

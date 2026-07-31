@@ -11,8 +11,6 @@ export async function fetchInstructorProfile(userId) {
 }
 
 export async function updateInstructorProfile(userId, updates) {
-  // Only ever touches plain profile fields — never role/verified/is_admin,
-  // and never section assignment (that's classroomService's job).
   const { rank, department, full_name } = updates;
   const { data, error } = await supabase
     .from('profiles')
@@ -24,11 +22,6 @@ export async function updateInstructorProfile(userId, updates) {
   return data;
 }
 
-/**
- * The gate App.jsx checks right after login. Uses a count-only head
- * request instead of fetching rows, since this runs on every session
- * load and we only need a boolean.
- */
 export async function hasAssignedSections(instructorId) {
   const { count, error } = await supabase
     .from('sections')
@@ -38,22 +31,18 @@ export async function hasAssignedSections(instructorId) {
   return (count || 0) > 0;
 }
 
-/**
- * Read-only list for the Profile page — sections + enrolled count,
- * fetched AFTER setup is already complete. Profile never writes here.
- */
+/** Read-only list for the Profile page. No courses join — see classroomService.js note. */
 export async function fetchAssignedSections(instructorId) {
   const { data, error } = await supabase
     .from('sections')
-    .select('id, name, courses ( code, title ), section_enrollments ( id )')
+    .select('id, name, description, section_enrollments ( id )')
     .eq('instructor_id', instructorId);
   if (error) throw error;
 
   return (data || []).map((s) => ({
     id: s.id,
-    sectionName: s.name,
-    courseCode: s.courses?.code,
-    courseTitle: s.courses?.title,
+    code: s.name,
+    title: s.description,
     enrolledCount: s.section_enrollments?.length || 0,
   }));
 }

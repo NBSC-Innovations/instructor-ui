@@ -1,20 +1,20 @@
 import { useState } from 'react';
-import { resolveSection, claimSection, createSection, suggestSections } from '../services/classroomService';
-import { isValidSectionRow } from '../utils/sectionValidation';
+import { resolveSectionByCode, claimSection, createSection, suggestSections } from '../services/classroomService';
+import { isValidCode, isValidTitle } from '../utils/sectionValidation';
 
 let nextId = 1;
 
 export function useInstructorSetup() {
-  const [rows, setRows] = useState([{ id: nextId++, courseCode: '', sectionName: '', suggestions: [], status: null, message: null }]);
+  const [rows, setRows] = useState([{ id: nextId++, code: '', suggestions: [], status: null, message: null }]);
   const [submitting, setSubmitting] = useState(false);
-  const [pendingCreate, setPendingCreate] = useState(null); // { rowId, courseCode, sectionName }
+  const [pendingCreate, setPendingCreate] = useState(null); // { rowId, code, title, titleError }
 
   function updateRow(id, patch) {
     setRows((prev) => prev.map((r) => (r.id === id ? { ...r, ...patch } : r)));
   }
 
   function addRow() {
-    setRows((prev) => [...prev, { id: nextId++, courseCode: '', sectionName: '', suggestions: [], status: null, message: null }]);
+    setRows((prev) => [...prev, { id: nextId++, code: '', suggestions: [], status: null, message: null }]);
   }
 
   function removeRow(id) {
@@ -27,50 +27,53 @@ export function useInstructorSetup() {
   }
 
   function applySuggestion(id, suggestion) {
-    updateRow(id, {
-      courseCode: suggestion.courses?.code || '',
-      sectionName: suggestion.name,
-      suggestions: [],
-    });
+    updateRow(id, { code: suggestion.name, suggestions: [] });
   }
 
   async function submitRow(row) {
-    const { valid, errors } = isValidSectionRow(row);
+    const { valid, error } = isValidCode(row.code);
     if (!valid) {
-      updateRow(row.id, { status: 'error', message: Object.values(errors)[0] });
-      return false;
+      updateRow(row.id, { status: 'error', message: error });
+      return;
     }
 
     updateRow(row.id, { status: 'checking', message: null });
     try {
-      const result = await resolveSection(row.courseCode, row.sectionName);
+      const result = await resolveSectionByCode(row.code);
 
       if (result.status === 'unclaimed') {
         await claimSection(result.section.id);
-        updateRow(row.id, { status: 'joined', message: 'Joined — existing section assigned to you.' });
-        return true;
+        updateRow(row.id, { status: 'joined', message: `Joined — "${result.section.description || result.section.name}" assigned to you.` });
       } else if (result.status === 'already_yours') {
         updateRow(row.id, { status: 'joined', message: 'Already assigned to you.' });
-        return true;
       } else if (result.status === 'taken') {
         updateRow(row.id, { status: 'error', message: 'Already assigned to another instructor. Contact an admin if this is wrong.' });
       } else if (result.status === 'not_found') {
-        setPendingCreate({ rowId: row.id, courseCode: row.courseCode, sectionName: row.sectionName });
+        setPendingCreate({ rowId: row.id, code: result.code, title: '', titleError: null });
         updateRow(row.id, { status: 'confirming', message: null });
       }
     } catch (err) {
       updateRow(row.id, { status: 'error', message: err.message || 'Something went wrong.' });
     }
-    return false;
   }
 
-  async function confirmCreate(onComplete) {
+  function setCreateTitle(title) {
+    setPendingCreate((prev) => (prev ? { ...prev, title, titleError: null } : prev));
+  }
+
+  async function confirmCreate() {
     if (!pendingCreate) return;
-    const { rowId, courseCode, sectionName } = pendingCreate;
+    const { rowId, code, title } = pendingCreate;
+
+    const { valid, error } = isValidTitle(title);
+    if (!valid) {
+      setPendingCreate((prev) => ({ ...prev, titleError: error }));
+      return;
+    }
+
     try {
-      await createSection(courseCode, courseCode, sectionName);
-      updateRow(rowId, { status: 'joined', message: 'Created new section, assigned to you.' });
-      onComplete?.();
+      await createSection(code, title);
+      updateRow(rowId, { status: 'joined', message: `Created "${title}" as a new section, assigned to you.` });
     } catch (err) {
       updateRow(rowId, { status: 'error', message: err.message || 'Could not create section.' });
     } finally {
@@ -85,18 +88,13 @@ export function useInstructorSetup() {
     setPendingCreate(null);
   }
 
-  /** Submits every row sequentially; returns true if at least one row ended up 'joined'. */
   async function submitAll() {
     setSubmitting(true);
-    let anyJoined = false;
     for (const row of rows) {
-      if (row.courseCode.trim() || row.sectionName.trim()) {
-        const joined = await submitRow(row);
-        anyJoined = anyJoined || joined;
-      }
+      if (row.code.trim()) await submitRow(row);
     }
     setSubmitting(false);
-    return anyJoined;
+    return rows.some((r) => r.status === 'joined');
   }
 
   return {
@@ -108,8 +106,8 @@ export function useInstructorSetup() {
     updateRow,
     refreshSuggestions,
     applySuggestion,
-    submitRow,
     submitAll,
+    setCreateTitle,
     confirmCreate,
     cancelCreate,
   };
