@@ -65,6 +65,7 @@ function App() {
             id: instructorProfile.id,
             fullName: instructorProfile.full_name,
             email: instructorProfile.email,
+            rank: instructorProfile.rank,
             department: instructorProfile.department,
             contactNumber: '', // profiles table doesn't have contact_number
             avatarUrl: instructorProfile.avatar_url,
@@ -240,6 +241,7 @@ function App() {
     
     const result = await updateInstructorProfile(profile.id, {
       full_name: updated.fullName,
+      rank: updated.rank,
       department: updated.department,
       avatar_url: updated.avatarUrl,
       bio: updated.bio,
@@ -320,7 +322,13 @@ function App() {
       case 'group-chats':
         return <GroupChats subjects={subjects} onEnterSubject={handleEnterSubject} />
       case 'profile':
-        return <Profile profile={profile} onSave={handleSaveProfile} />
+        return (
+          <Profile
+            profile={profile}
+            onSave={handleSaveProfile}
+            onAssigned={handleSectionChange}
+          />
+        )
       default:
         return <Dashboard subjects={subjects} onEnterSubject={handleEnterSubject} />
     }

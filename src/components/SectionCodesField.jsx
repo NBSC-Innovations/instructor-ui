@@ -102,7 +102,7 @@ export default function SectionCodesField({ onAssigned }) {
 
   return (
     <div className="section-codes-field">
-      <label className="login__label">Section Codes</label>
+      <label className="section-codes-field__label">Section Codes</label>
       <p className="section-codes-field__hint">
         Enter each subject and section you handle. Existing sections with students
         already matched will be joined directly; new ones need confirmation.
@@ -111,7 +111,7 @@ export default function SectionCodesField({ onAssigned }) {
       <form className="section-codes-field__row" onSubmit={handleSubmitRow}>
         <div className="section-codes-field__input-wrap">
           <input
-            className="login__input"
+            className="section-codes-field__input"
             placeholder="Course code (e.g. ICS001)"
             value={courseCode}
             onChange={(e) => handleCourseCodeChange(e.target.value)}
@@ -128,26 +128,26 @@ export default function SectionCodesField({ onAssigned }) {
           )}
         </div>
         <input
-          className="login__input"
+          className="section-codes-field__input"
           placeholder="Section (e.g. BSIT 3A)"
           value={sectionName}
           onChange={(e) => setSectionName(e.target.value)}
         />
-        <button className="login__submit-btn" type="submit" disabled={busy} style={{ width: 'auto', padding: '10px 18px' }}>
+        <button className="section-codes-field__button" type="submit" disabled={busy}>
           Add
         </button>
       </form>
 
       {pendingCreate && (
-        <div className="alert alert--info" style={{ position: 'static', transform: 'none', margin: '10px 0' }}>
-          <span className="alert__msg">
+        <div className="section-codes-field__pending">
+          <span className="section-codes-field__pending-message">
             No existing section matches "{pendingCreate.courseCode} {pendingCreate.sectionName}".
             Create it as a new section under your name?
           </span>
-          <button className="login__link-btn login__link-btn--sm" onClick={confirmCreate} disabled={busy}>
+          <button className="section-codes-field__confirm" onClick={confirmCreate} disabled={busy}>
             Yes, create it
           </button>
-          <button className="alert__close" onClick={() => setPendingCreate(null)}>Cancel</button>
+          <button className="section-codes-field__cancel" onClick={() => setPendingCreate(null)}>Cancel</button>
         </div>
       )}
 

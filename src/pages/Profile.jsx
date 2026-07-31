@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import '../styles/Profile.css'
+import SectionCodesField from '../components/SectionCodesField.jsx'
 
 // Department is descriptive metadata only — per the earlier discussion, it should
 // never be used to compute which sections an instructor can access (that's an
@@ -40,7 +41,7 @@ function getInitials(name) {
 // stays read-only in the UI regardless — it's the institutional-email identity used
 // to verify the account, not something an instructor should be able to self-edit.
 
-function Profile({ profile, onSave }) {
+function Profile({ profile, onSave, onAssigned }) {
   const [isEditing, setIsEditing] = useState(false)
   const [form, setForm] = useState(profile || {})
 
@@ -91,8 +92,12 @@ function Profile({ profile, onSave }) {
               <span className="profile__field-value">{profile?.email || '—'}</span>
             </div>
             <div className="profile__field">
-              <span className="profile__field-label">Department</span>
+              <span className="profile__field-label">College/Department</span>
               <span className="profile__field-value">{profile?.department || '—'}</span>
+            </div>
+            <div className="profile__field">
+              <span className="profile__field-label">Rank</span>
+              <span className="profile__field-value">{profile?.rank || '—'}</span>
             </div>
             {profile?.bio && (
               <div className="profile__field">
@@ -119,12 +124,22 @@ function Profile({ profile, onSave }) {
             </label>
 
             <label className="profile__label">
-              Department
+              College/Department
               <select value={form.department || ''} onChange={handleChange('department')}>
                 {DEPARTMENTS.map((d) => (
                   <option key={d} value={d}>{d}</option>
                 ))}
               </select>
+            </label>
+
+            <label className="profile__label">
+              Rank
+              <input
+                type="text"
+                placeholder="e.g. Instructor I"
+                value={form.rank || ''}
+                onChange={handleChange('rank')}
+              />
             </label>
 
             <label className="profile__label">
@@ -146,6 +161,8 @@ function Profile({ profile, onSave }) {
                 rows={4}
               />
             </label>
+
+            <SectionCodesField onAssigned={onAssigned} />
 
             <div className="profile__form-actions">
               <button type="button" className="profile__cancel" onClick={handleCancel}>
