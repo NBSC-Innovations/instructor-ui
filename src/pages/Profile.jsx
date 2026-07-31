@@ -142,7 +142,7 @@ function Profile({ profile, onSave }) {
                 <ul className="profile__assigned-sections">
                   {assignedSections.map((section) => (
                     <li key={section.id} className="profile__assigned-section">
-                      <span>{section.courseCode || '—'} — {section.sectionName}</span>
+                      <span>{section.code || '—'} — {section.title || 'Untitled subject'}</span>
                       <span>{section.enrolledCount} enrolled</span>
                     </li>
                   ))}
