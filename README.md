@@ -1,82 +1,79 @@
+# NBSC Instructor UI
 
-# NBSC Instructor Portal — UI
+Standalone instructor-facing React application for GC Finder. This repository contains the instructor authentication flow, first-run section setup, assigned-section views, section chat, Members panel, message pinning, and instructor profile editing.
 
-Instructor-facing web app for the Group Chat Finder project. Gives each instructor a
-searchable list of the sections they teach, and an in-app text chat per section that
-students are automatically matched into.
+This document describes the current code and database assumptions so the features can be merged into the main web application without accidentally bringing back the older course-based section logic.
 
-This README documents the **current state of this repo only** — the Instructor UI.
-It's a companion piece to the Student UI repo; a few decisions here (especially
-around chat creation and student matching) depend on what the Student UI's COR/OCR
-flow actually does, so expect this doc to need updates once that side is finalized.
+## What The App Does
 
+An instructor can:
 
-## NBSC Instructor Portal
+- Sign in with Supabase Auth using email/password or Google OAuth.
+- Complete a first-run setup by entering the section codes they handle.
+- Search existing section codes and claim unassigned sections.
+- Create a new section by entering a code and subject title.
+- View assigned sections and their enrolled student counts.
+- Open a section chat.
+- View all students and the instructor in the chat Members panel.
+- Send text messages.
+- Pin and unpin messages as the instructor.
+- Edit Rank and College/Department in their profile.
 
-Standalone instructor-facing UI for GC Finder. Instructors can view their assigned sections, open a section chat, see enrolled members, send text messages, pin messages, and update their own profile.
-
-This repository is independent. It does not import code or data from another project.
+The app does not create a separate classroom, group chat, or chat-membership row. A section is the classroom, and `gc_messages.section_id` connects messages directly to it.
 
 ## Tech Stack
 
 - React 19
 - Vite
-- Supabase Auth and Postgres
-- Supabase Row Level Security (RLS)
-- Plain CSS with NBSC theme variables
+- Supabase Auth
+- Supabase Postgres and Row Level Security
+- Plain CSS using the NBSC variables in `src/index.css`
 
 ## Run Locally
 
 ### Requirements
 
 - Node.js and npm
-- A Supabase project using `src/database/supabase-schema-clean.sql`
+- A Supabase project with the required tables, columns, and RLS policies already applied
 
 ### Environment
 
-Create a `.env` file in the project root:
+Create `.env` in the project root:
 
 ```env
 VITE_SUPABASE_URL=https://your-project.supabase.co
 VITE_SUPABASE_ANON_KEY=your-anon-key
 ```
 
-Only the public Supabase URL and anon key belong in this frontend. Do not expose a service-role key in a browser build.
+Only the public Supabase URL and anon key belong in the browser app. Never expose a service-role key in the frontend.
 
-### Install and start
+### Commands
 
 ```bash
 npm install
 npm run dev
-```
-
-Useful commands:
-
-```bash
 npm run build
 npm run lint
 npm run preview
 ```
 
-## Database Setup
+## Current Database Shape
 
-Run `src/database/supabase-schema-clean.sql` in the Supabase SQL Editor. This is the current intended schema for this repository.
+The live section-assignment flow was checked against Supabase data. It does not use a course/section pair.
 
-The script:
+### Section rows
 
-- Creates `profiles`, `courses`, `sections`, `section_enrollments`, and `gc_messages`.
-- Creates user-role and enrollment-status enum types.
-- Adds indexes and RLS policies.
-- Creates the new-user profile trigger.
-- Adds the email-domain auth hook function.
-- Enables realtime for `gc_messages`.
-- Creates backup tables before dropping the old schema.
+The important fields in `sections` are:
 
-After running the script, enable the `hook_restrict_to_nbsc_domain` function under Supabase Authentication Hooks using the Before User Created hook.
+- `id`: Section primary key.
+- `name`: The complete section code, for example `ICS79`.
+- `description`: The human-readable subject title.
+- `instructor_id`: The assigned instructor profile ID, or `NULL` when unassigned.
+- `course_id`: Nullable and currently unused by the existing section rows.
 
-## Database Structure
+There is one code input per setup row. Do not split it into `courseCode` and `sectionName`.
 
-The current schema is section-centered:
+### Related tables
 
 ```text
 profiles
@@ -84,236 +81,306 @@ profiles
   |-- section_enrollments.student_id
   `-- gc_messages.sender_id
 
-courses
-  `-- sections.course_id
-
 sections
   |-- section_enrollments.section_id
   `-- gc_messages.section_id
 ```
 
-### Tables
+The active section setup and profile services query `sections` directly. They do not require a populated `courses` row or a `courses:course_id` relationship.
 
-#### `profiles`
+### `profiles`
 
-One row per authenticated user.
+Relevant fields:
 
-Important fields:
+- `id`
+- `full_name`
+- `email`
+- `rank`
+- `department`
+- `role`
+- `verified`
 
-- `id`: Auth user ID and primary key
-- `full_name`: Display name
-- `email`: Login email
-- `role`: `student` or `instructor`
-- `student_id`: Institutional student number for students
-- `verified`, `is_admin`: Account-management fields
+### `section_enrollments`
 
-#### `courses`
+This is the source of truth for section membership:
 
-Subject catalog. A course is not assigned directly to an instructor in the clean schema.
+- `student_id` references `profiles.id`.
+- `section_id` references `sections.id`.
+- The nested `id` rows are counted for the Profile Assigned Sections display and Members panel.
 
-#### `sections`
+### `gc_messages`
 
-The actual class instance.
+Messages belong directly to a section:
 
-Important fields:
+- `section_id` references `sections.id`.
+- `sender_id` references `profiles.id`.
+- `content` stores the message text.
+- `is_pinned` stores instructor pin state.
+- `is_deleted` hides deleted messages.
 
-- `id`: Section ID used by chat features
-- `course_id`: Related catalog course
-- `name`: Section code, such as `BSIT 3A`
-- `instructor_id`: Instructor assigned to the section
-- `room`, `max_capacity`, `current_enrollment`
+Do not add `group_chats` or `group_chat_members` logic for this flow.
 
-#### `section_enrollments`
+## Authentication And First-Run Gate
 
-The source of truth for who belongs to a section.
+Authentication remains in `src/pages/Login.jsx`. `App.jsx` still owns session restoration and the auth listener:
 
-- `student_id` references `profiles.id`
-- `section_id` references `sections.id`
-- `status` is `active` or `dropped`
+1. `supabase.auth.getSession()` restores the persisted session.
+2. `supabase.auth.onAuthStateChange()` reacts to sign-in and sign-out.
+3. When there is no session, `App.jsx` renders `<Login />`.
+4. When a session exists, `instructorService.fetchInstructorProfile(session.user.id)` loads the profile.
+5. `instructorService.hasAssignedSections(profile.id)` checks whether the instructor owns at least one section.
+6. While the check runs, App shows the existing loading state.
+7. When the result is `false`, App renders `<InstructorSetup>` instead of the Sidebar and normal page shell.
+8. When the result is `true`, App loads the normal sections, messages, and navigation shell.
 
-#### `gc_messages`
+Supabase client configuration uses `persistSession: true`, so a previously authenticated browser can open directly into setup or the normal app. Login appears when the session is absent, after logout, or in a fresh browser session.
 
-Messages belong directly to a section.
+## First-Run Instructor Setup
 
-- `section_id` identifies the chat
-- `sender_id` references `profiles.id`
-- `content` stores text
-- `is_pinned` controls instructor pinning
-- `is_deleted` hides deleted messages
+### Files
 
-There are no `group_chats` or `group_chat_members` tables in the clean schema.
+- `src/pages/InstructorSetup.jsx`: Full-page first-run wrapper.
+- `src/components/InstructorSetupForm.jsx`: Form state and submission UI.
+- `src/components/SectionCodeInput.jsx`: One section-code row.
+- `src/hooks/useInstructorSetup.js`: Multi-row setup state and workflow.
+- `src/services/classroomService.js`: Section lookup, claim, and create writes.
+- `src/utils/sectionValidation.js`: Code and subject-title validation.
+- `src/styles/InstructorSetup.css`: Setup-page and setup-form styling.
 
-## Application Structure
+### Setup row shape
 
-```text
-src/
-  App.jsx                 Auth, global state, page switching, chat actions
-  App.css                 Application shell and layout
-  index.css               Shared theme variables and global styles
-  components/
-    Sidebar.jsx           Main navigation and logout
-  pages/
-    Login.jsx             Authentication screen
-    Dashboard.jsx         Overview and shortcuts
-    MySubjects.jsx        Assigned-section management
-    GroupChats.jsx        Section chat list
-    ClassRoom.jsx         Chat screen and Members panel
-    Profile.jsx           Instructor profile editor
-  services/
-    database.js           Supabase reads and writes
-  styles/
-    *.css                 Page and component styles
-  utils/
-    supabaseClient.js     Supabase browser client
-    toast.jsx              Toast notifications
-  database/
-    supabase-schema-clean.sql  Current database schema
-```
-
-There is no router library. `App.jsx` uses `activePage` for the selected navigation page and `selectedSubjectId` for the open section chat.
-
-## Runtime Flow
-
-1. Supabase restores or creates the auth session.
-2. `App.jsx` finds the instructor profile by email.
-3. `fetchSectionsWithMessages(instructorId)` loads the instructor's sections.
-4. For each section, the service loads:
-   - Messages from `gc_messages` using `section_id`.
-   - Student members from `section_enrollments` using `student_id`.
-   - The instructor from `sections.instructor_id`.
-5. The service converts database rows into the `subject` object consumed by the pages.
-6. `ClassRoom.jsx` renders messages, pins, composer, and members.
-7. Sending and pinning write to Supabase and update local React state.
-
-## Subject Object
-
-The main section object passed through the UI currently looks like this:
+Each row contains one code:
 
 ```js
 {
-  id: section.id,
-  code: section.name,
-  name: section.description || 'No description',
-  courseId: section.course_id,
-  enrolledCount: 3,
-  members: [
-    {
-      id: profile.id,
-      full_name: 'Student Name',
-      email: 'student@nbsc.edu.ph',
-      student_id: '12345',
-      role: 'student',
-      roleLabel: null
-    },
-    {
-      id: instructor.id,
-      full_name: 'Instructor Name',
-      role: 'instructor',
-      roleLabel: '(Instructor)'
-    }
-  ],
-  messages: [
-    {
-      id: message.id,
-      senderName: 'Student Name',
-      senderRole: 'student',
-      content: 'Hello',
-      createdAt: message.created_at,
-      pinned: false
-    }
-  ]
+  id,
+  code,
+  suggestions,
+  status,
+  message
 }
 ```
 
-## Main Service Functions
+There is no `courseCode` or `sectionName` in the current setup flow.
 
-All Supabase access should normally be added to `src/services/database.js` rather than directly inside page components.
+### Setup behavior
 
-- `fetchInstructorProfile(email)`: Loads the signed-in instructor profile.
-- `fetchInstructorSections(instructorId)`: Loads sections assigned to the instructor.
-- `fetchSectionMessages(sectionId)`: Loads messages and sender profiles for one section.
-- `fetchSectionMembers(sectionId)`: Loads enrolled students and the section instructor.
-- `fetchSectionsWithMessages(instructorId)`: Builds the complete subject objects used by the UI.
-- `sendMessage(sectionId, senderId, content)`: Inserts a message into `gc_messages`.
-- `toggleMessagePin(messageId, isPinned)`: Updates the pin state of a message.
-- `updateInstructorProfile(profileId, updates)`: Updates the instructor's profile.
+1. The instructor types a section code such as `ICS79`.
+2. Suggestions search `sections.name`.
+3. Selecting a suggestion fills the single `code` field.
+4. Submitting calls `resolveSectionByCode(code)`.
+5. An unassigned existing row is claimed by setting `sections.instructor_id`.
+6. A row assigned to the current instructor shows `Already assigned to you.`.
+7. A row assigned to another instructor is rejected.
+8. A missing code opens a confirmation prompt that requires a subject title.
+9. Confirming creates one `sections` row with:
 
-## Adding Features
+```js
+{
+  name: normalizedCode,
+  description: title,
+  instructor_id: currentUser.id
+}
+```
 
-### Chat features
+`course_id` is intentionally omitted and remains `NULL`.
 
-Add the UI in `src/pages/ClassRoom.jsx`, styles in `src/styles/ClassRoom.css`, and database operations in `src/services/database.js`.
+The setup completion callback rechecks `hasAssignedSections` and then loads the normal app. The classroom service does not create a chat entity because the section row itself is the classroom.
 
-Keep chat records connected to `section_id`. Do not reintroduce course-level chat relationships or the old group-chat tables.
+## Profile Page
 
-Examples:
+`src/pages/Profile.jsx` is intentionally display-oriented.
 
-- Reactions: add a `message_reactions` table with `message_id` and `user_id`.
-- Read receipts: add a `message_reads` table with `message_id` and `user_id`.
-- Attachments: use Supabase Storage plus a message-attachments table.
-- Announcements: add an `announcements` table with `section_id`.
-- Message search: query `gc_messages` by `section_id` and search text.
+### Read-only information
 
-### New section-level features
+- Name
+- Email
+- Assigned Sections
 
-Use `section_id` as the primary relationship. The normal pattern is:
+Assigned Sections are loaded by `instructorService.fetchAssignedSections(instructorId)` and rendered from this shape:
 
-1. Add a table or column to the clean schema.
-2. Add the required foreign keys and indexes.
-3. Add RLS policies for section instructors and enrolled students.
-4. Add service functions in `database.js`.
-5. Load the data in `App.jsx` or the relevant page.
-6. Update local state after mutations so the UI responds immediately.
+```js
+{
+  id,
+  code,
+  title,
+  enrolledCount
+}
+```
 
-## Security and RLS
+The list displays the code, subject title, and enrolled count. It does not claim, create, or modify sections.
 
-The clean schema uses the authenticated user's ID from `auth.uid()`.
+### Editable information
 
-Expected access rules:
+- Rank
+- College/Department
 
-- Instructors can access their own profile.
-- Instructors can access sections where `sections.instructor_id = auth.uid()`.
-- Instructors can read members assigned to their sections.
-- Instructors can read, send, and pin messages in their sections.
-- Students can access sections and messages where they have an active section enrollment.
+These fields are saved using `instructorService.updateInstructorProfile(profileId, updates)`. Profile does not call `classroomService`.
 
-Whenever adding a table, define its RLS policies in the migration. A frontend query cannot grant access that RLS denies.
+The old `SectionCodesField.jsx` component was deleted. Section assignment belongs only to the first-run `InstructorSetup` flow.
 
-## Current Caveats
+## Service Boundaries
 
-The active instructor chat path uses the clean section-based schema. Some older service functions remain in `database.js` and still reference the previous course-based schema. Avoid using these for new features:
+### `src/services/instructorService.js`
 
-- `fetchCoursesWithMessages`
-- `fetchCourseEnrollments`
-- `fetchCourseEnrollmentCount`
-- The old course-based message helpers
+Profile and read-only assignment queries:
 
-`fetchInstructorCourses()` also still expects `courses.instructor_id`, but the clean schema assigns instructors to `sections`, not courses. The section-based functions are the reliable path for the current instructor UI.
+- `fetchInstructorProfile(userId)`: Loads the current profile by Auth user ID.
+- `updateInstructorProfile(userId, updates)`: Updates only `rank`, `department`, and `full_name`.
+- `hasAssignedSections(instructorId)`: Returns a boolean based on assigned section count.
+- `fetchAssignedSections(instructorId)`: Returns `{ id, code, title, enrolledCount }` rows for Profile.
 
-The clean `profiles` table does not currently contain `avatar_url`, so the Members panel uses initials as its normal fallback. Add that column and an RLS-safe storage strategy before implementing uploaded avatars.
+### `src/services/classroomService.js`
 
-## Scope
+The only assignment write service:
 
-Currently included:
+- `suggestSections(query)`: Searches `sections.name`.
+- `resolveSectionByCode(code)`: Finds an existing section and returns `unclaimed`, `already_yours`, `taken`, or `not_found`.
+- `claimSection(sectionId)`: Claims an unassigned section.
+- `createSection(code, title)`: Inserts directly into `sections` with `course_id` omitted.
 
-- Instructor authentication
-- Assigned-section browsing
-- Section group chat
-- Message sending
-- Instructor-only pinning
-- Section Members panel
-- Instructor profile editing
+This service does not create `group_chats`, classroom records, or membership records.
+
+### `src/utils/sectionValidation.js`
+
+- `normalizeCode(value)`: Trims, collapses spaces, and uppercases the code.
+- `isValidCode(code)`: Requires a non-empty code with a maximum length of 20.
+- `isValidTitle(title)`: Requires a non-empty subject title with a maximum length of 120.
+
+### Existing chat service path
+
+The active chat data path remains in `src/services/database.js` and `src/App.jsx`:
+
+- Sections are loaded for the instructor.
+- Messages are loaded from `gc_messages` by `section_id`.
+- Sender profiles are joined through `sender_id`.
+- Members are loaded from `section_enrollments` and the section instructor profile.
+- Sending inserts into `gc_messages` with `section_id`.
+- Pinning updates `gc_messages.is_pinned`.
+
+`ClassRoom.jsx` renders the chat and Members panel. Its section behavior was not changed by the single-code setup correction.
+
+## Main Application Structure
+
+```text
+src/
+  App.jsx
+    Auth/session restoration, first-run gate, global state, page switching
+  components/
+    InstructorSetupForm.jsx
+    SectionCodeInput.jsx
+    Sidebar.jsx
+  hooks/
+    useInstructorSetup.js
+  pages/
+    Login.jsx
+    InstructorSetup.jsx
+    Dashboard.jsx
+    MySubjects.jsx
+    GroupChats.jsx
+    ClassRoom.jsx
+    Profile.jsx
+  services/
+    instructorService.js
+    classroomService.js
+    database.js
+  styles/
+    InstructorSetup.css
+    Profile.css
+    ClassRoom.css
+    other page styles
+  utils/
+    sectionValidation.js
+    supabaseClient.js
+    toast.jsx
+```
+
+There is no router library. `App.jsx` uses `activePage` and `selectedSubjectId` to choose the current view.
+
+## Integration Guide For The Main Web App
+
+When merging these features into the main web application:
+
+1. Copy the instructor setup files and preserve their imports:
+   - `InstructorSetup.jsx`
+   - `InstructorSetupForm.jsx`
+   - `SectionCodeInput.jsx`
+   - `useInstructorSetup.js`
+   - `classroomService.js`
+   - `sectionValidation.js`
+   - `InstructorSetup.css`
+2. Copy the instructor service functions or merge their equivalent functions into the main service layer.
+3. Add `rank` to the profile query and profile state.
+4. Add `rank` and `department` to the profile update payload.
+5. Add the `hasAssignedSections` check after auth profile loading and before rendering the normal app shell.
+6. Render the setup page when the check is false.
+7. Recheck the assignment after setup completion.
+8. Keep Profile read-only for assignment data; do not put claim/create actions in Profile.
+9. Preserve the one-code data contract: `sections.name` is the code and `sections.description` is the title.
+10. Preserve `section_id` as the relationship for chat messages.
+11. Do not introduce a courses-table join into the setup or Profile assignment flow.
+12. Preserve the existing RLS policies already supporting section claims, course inserts if needed elsewhere, and section inserts.
+13. Verify the main app's existing route/navigation conventions before adding any router abstraction. This standalone app does not use React Router.
+
+## Course-Join Risks And Legacy Code
+
+The live section-assignment flow does not depend on `courses`. However, this repository still contains older code that assumes a populated `sections.course_id` and a related courses row.
+
+These files/functions should be reviewed separately before merging:
+
+- `src/services/sectionAssignment.js`: Legacy two-field `courseCode` plus `sectionName` flow, including `courses: (...)` joins and course-based section creation.
+- `src/services/database.js`:
+  - `fetchCourseSections(courseId)` uses course IDs.
+  - `fetchCourseEnrollmentCount(courseId)` uses the old `enrollments` table.
+  - `fetchCourseEnrollments(courseId)` uses course enrollment rows.
+  - `fetchCoursesWithMessages(instructorId)` uses old course/message assumptions.
+  - `createSection(sectionData)` expects course-related fields and old section columns.
+  - `fetchInstructorSections()` contains a `courses:course_id` nested select.
+  - Other student-facing helpers use `course_id` and course joins.
+- `App.jsx` still imports older database helpers for the normal instructor shell. The active setup/profile correction does not silently rewrite those helpers because they may represent a separate migration issue.
+
+Before merging into the main web app, decide whether the main app is also moving to the live single-code section model. If it is, audit and replace these legacy functions deliberately rather than mixing both contracts.
+
+## RLS And Security Expectations
+
+Do not change RLS as part of the frontend merge unless the database owner explicitly plans a separate migration. The current setup relies on policies that allow the authenticated instructor to:
+
+- Read sections needed for suggestions and resolution.
+- Claim only an unassigned section.
+- Insert a new section assigned to the current user.
+- Read their assigned sections and section enrollment counts.
+- Read, send, and pin messages for their sections.
+
+The frontend cannot grant access that Supabase RLS denies. Test setup actions with a real authenticated instructor account.
+
+## Scope And Non-Changes
+
+The single-code correction did not modify:
+
+- RLS policies.
+- The `profiles.rank` schema column.
+- `ClassRoom.jsx`.
+- `MySubjects.jsx`.
+- The earlier Members panel behavior.
+- The App session-restore and auth-listener logic.
+- The database schema.
 
 Not currently included:
 
-- Assignments, grades, quizzes, or attendance
-- Message search
-- Unread counts or read receipts
-- Realtime message subscriptions
-- File or image messages
-- Member management actions
+- Assignments, grades, quizzes, or attendance.
+- Message search.
+- Unread counts or read receipts.
+- File/image messages.
+- Member management actions.
+- Realtime message subscriptions in the active chat UI.
 
+## Validation
 
+Run the following before merging:
 
+```bash
+npm run build
+npm run lint
+```
 
-
+The production build should complete successfully. A Vite warning may appear because `src/services/database.js` is both statically imported by `App.jsx` and dynamically imported by `MySubjects.jsx`; this warning is unrelated to the single-code setup flow.
