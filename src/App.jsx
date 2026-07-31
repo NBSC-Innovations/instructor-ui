@@ -172,19 +172,19 @@ function App() {
     }
     
     const subject = subjects.find((s) => s.id === subjectId)
-    if (!subject?.courseId) {
-      console.error('[handleSendMessage] No course ID found for subject:', subjectId)
+    if (!subject?.id) {
+      console.error('[handleSendMessage] No section ID found for subject:', subjectId)
       return
     }
     
     console.log('[handleSendMessage] Sending message with:', {
-      courseId: subject.courseId,
+      sectionId: subject.id,
       senderId: session.user.id,
       profileId: profile?.id,
       content: content
     })
     
-    const newMessage = await sendMessage(subject.courseId, session.user.id, content)
+    const newMessage = await sendMessage(subject.id, session.user.id, content)
     
     if (newMessage) {
       setSubjects((prev) =>

@@ -31,6 +31,27 @@ function SendIcon(props) {
   )
 }
 
+function UsersIcon(props) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+      strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+      <circle cx="9" cy="7" r="4" />
+      <path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" />
+    </svg>
+  )
+}
+
+function getInitials(name) {
+  return (name || '?')
+    .split(' ')
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0])
+    .join('')
+    .toUpperCase()
+}
+
 function formatTime(iso) {
   const d = new Date(iso)
   return d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
@@ -58,6 +79,7 @@ function ClassRoom({ subject, onBack, onSendMessage, onTogglePin }) {
 
   const messages = subject.messages ?? []
   const pinnedMessages = messages.filter((m) => m.pinned)
+  const members = subject.members ?? []
 
   useEffect(() => {
     setCurrentDate(formatDate(new Date()))
@@ -106,8 +128,9 @@ function ClassRoom({ subject, onBack, onSendMessage, onTogglePin }) {
         </div>
       )}
 
-      <div className="classroom__chat">
-        <div className="classroom__messages" ref={scrollRef}>
+      <div className="classroom__body">
+        <div className="classroom__chat">
+          <div className="classroom__messages" ref={scrollRef}>
           {messages.length === 0 && (
             <p className="classroom__empty">No messages yet. Say hello to the class.</p>
           )}
@@ -138,19 +161,44 @@ function ClassRoom({ subject, onBack, onSendMessage, onTogglePin }) {
               </div>
             )
           })}
+          </div>
+
+          <form className="classroom__composer" onSubmit={handleSend}>
+            <input
+              type="text"
+              placeholder="Type a message or paste a link..."
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+            />
+            <button type="submit" className="classroom__send" aria-label="Send message">
+              <SendIcon width={18} height={18} />
+            </button>
+          </form>
         </div>
 
-        <form className="classroom__composer" onSubmit={handleSend}>
-          <input
-            type="text"
-            placeholder="Type a message or paste a link..."
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-          />
-          <button type="submit" className="classroom__send" aria-label="Send message">
-            <SendIcon width={18} height={18} />
-          </button>
-        </form>
+        <aside className="classroom__members">
+          <div className="classroom__members-header">
+            <div className="classroom__members-title">
+              <UsersIcon width={17} height={17} />
+              <span>Members</span>
+            </div>
+            <span className="classroom__members-count">{members.length}</span>
+          </div>
+          <div className="classroom__members-list">
+            {members.map((member) => (
+              <div key={member.id} className="classroom__member">
+                <div className="classroom__member-avatar">
+                  {member.avatar_url ? <img src={member.avatar_url} alt="" /> : getInitials(member.full_name)}
+                </div>
+                <div className="classroom__member-info">
+                  <span className="classroom__member-name">{member.full_name || 'Unknown'}</span>
+                  {member.roleLabel && <span className="classroom__member-role">{member.roleLabel}</span>}
+                </div>
+              </div>
+            ))}
+            {members.length === 0 && <p className="classroom__members-empty">No members found.</p>}
+          </div>
+        </aside>
       </div>
     </section>
   )

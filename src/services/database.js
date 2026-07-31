@@ -95,7 +95,6 @@ export async function fetchInstructorCourses(instructorId) {
       .from('courses')
       .select('*')
       .eq('instructor_id', instructorId)
-      .eq('is_active', true)
       .order('code', { ascending: true })
 
     if (error) throw error
@@ -123,35 +122,85 @@ export async function fetchCourseSections(courseId) {
   }
 }
 
-// Fetch messages for a specific course (from gc_messages table)
-export async function fetchCourseMessages(courseId) {
+// Fetch messages for a section (from the clean schema's section-owned chat).
+export async function fetchSectionMessages(sectionId) {
   try {
-    // Use the SECURITY DEFINER function to bypass RLS
-    const { data, error } = await supabase.rpc('fetch_course_messages', {
-      p_course_id: courseId
-    })
+    const { data, error } = await supabase
+      .from('gc_messages')
+      .select(`
+        id,
+        section_id,
+        sender_id,
+        content,
+        is_pinned,
+        created_at,
+        profiles:sender_id (
+          id,
+          full_name,
+          student_id,
+          role
+        )
+      `)
+      .eq('section_id', sectionId)
+      .eq('is_deleted', false)
+      .order('created_at', { ascending: true })
 
     if (error) throw error
-
-    // Manually fetch profiles for each message
-    const messagesWithProfiles = await Promise.all(
-      data.map(async (message) => {
-        const { data: profileData } = await supabase
-          .from('profiles')
-          .select('full_name, student_id, role')
-          .eq('id', message.sender_id)
-          .single()
-        
-        return {
-          ...message,
-          profiles: profileData || { full_name: 'Unknown', student_id: null, role: 'student' }
-        }
-      })
-    )
-
-    return messagesWithProfiles
+    return data || []
   } catch (error) {
-    console.error('Error fetching course messages:', error)
+    console.error('Error fetching section messages:', error)
+    return []
+  }
+}
+
+// Fetch section students and include the instructor.
+export async function fetchSectionMembers(sectionId) {
+  try {
+    const [{ data: sectionEnrollments, error: enrollmentsError }, { data: section, error: sectionError }] = await Promise.all([
+      supabase
+        .from('section_enrollments')
+        .select(`
+          id,
+          student_id,
+          profiles:student_id (
+            id,
+            full_name,
+            email,
+            student_id,
+            role
+          )
+        `)
+        .eq('section_id', sectionId),
+      supabase
+        .from('sections')
+        .select(`
+          instructor_id,
+          profiles:instructor_id (
+            id,
+            full_name,
+            email,
+            student_id,
+            role
+          )
+        `)
+        .eq('id', sectionId)
+        .single()
+    ])
+
+    if (enrollmentsError) throw enrollmentsError
+    if (sectionError) throw sectionError
+
+    const students = (sectionEnrollments || [])
+      .map((entry) => entry.profiles)
+      .filter(Boolean)
+      .map((profile) => ({ ...profile, roleLabel: null }))
+    const instructor = section?.profiles
+      ? { ...section.profiles, roleLabel: '(Instructor)' }
+      : null
+
+    return instructor ? [...students, instructor] : students
+  } catch (error) {
+    console.error('Error fetching section members:', error)
     return []
   }
 }
@@ -174,21 +223,19 @@ export async function toggleMessagePin(messageId, isPinned) {
   }
 }
 
-// Send a new message to a course using the SECURITY DEFINER function
-export async function sendMessage(courseId, senderId, content) {
+// Send a new message to a section.
+export async function sendMessage(sectionId, senderId, content) {
   try {
     console.log('[sendMessage] Attempting to send message:', {
-      courseId,
+      sectionId,
       senderId,
       content
     })
 
-    // Use the SECURITY DEFINER function to bypass RLS
-    const { data, error } = await supabase.rpc('insert_message', {
-      p_course_id: courseId,
-      p_sender_id: senderId,
-      p_content: content
-    })
+    const { data, error } = await supabase
+      .from('gc_messages')
+      .insert({ section_id: sectionId, sender_id: senderId, content })
+      .select()
 
     if (error) {
       console.error('[sendMessage] Database error:', error)
@@ -198,11 +245,13 @@ export async function sendMessage(courseId, senderId, content) {
     console.log('[sendMessage] Message inserted successfully:', data)
 
     // Fetch profile data separately
-    const { data: profileData } = await supabase
+    const { data: profileData, error: profileError } = await supabase
       .from('profiles')
-      .select('full_name, student_id, role')
+      .select('id, full_name, student_id, role')
       .eq('id', senderId)
       .single()
+
+    if (profileError) throw profileError
 
     return {
       ...data[0],
@@ -418,30 +467,32 @@ export async function fetchSectionsWithMessages(instructorId) {
 
     const sectionsWithMessages = await Promise.all(
       sections.map(async (section) => {
-        const messages = await fetchCourseMessages(section.course_id)
-        const enrolledCount = await fetchCourseEnrollmentCount(section.course_id)
-        const enrollments = await fetchCourseEnrollments(section.course_id)
+        const messages = await fetchSectionMessages(section.id)
+        const members = await fetchSectionMembers(section.id)
 
         return {
           id: section.id,
           code: section.name,
           name: section.description || 'No description',
           section: section.name,
-          enrolledCount: enrolledCount,
-          enrollments: enrollments.map(enrollment => ({
-            id: enrollment.id,
-            studentId: enrollment.profiles?.id,
-            fullName: enrollment.profiles?.full_name || 'Unknown',
-            email: enrollment.profiles?.email,
-            studentNumber: enrollment.profiles?.student_id,
-            role: enrollment.profiles?.role,
-            enrolledAt: enrollment.enrolled_at,
-            status: enrollment.status
-          })),
+          enrolledCount: members.filter((member) => member.roleLabel !== '(Instructor)').length,
+          members,
+          enrollments: members
+            .filter((member) => member.roleLabel !== '(Instructor)')
+            .map((member) => ({
+              id: member.id,
+              studentId: member.id,
+              fullName: member.full_name || 'Unknown',
+              email: member.email,
+              studentNumber: member.student_id,
+              role: member.role,
+              status: 'active'
+            })),
           messages: messages.map(msg => ({
             id: msg.id,
             senderName: msg.profiles?.full_name || 'Unknown',
             senderRole: msg.profiles?.role || 'student',
+            senderAvatarUrl: msg.profiles?.avatar_url || null,
             content: msg.content,
             createdAt: msg.created_at,
             pinned: msg.is_pinned || false
