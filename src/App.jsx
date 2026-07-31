@@ -10,12 +10,15 @@ import { supabase } from './utils/supabaseClient'
 import { useToast } from './utils/toast.jsx'
 import Login from './pages/Login.jsx'
 import NbscLogo from './assets/Nbsc-logo.png'
+import InstructorSetup from './pages/InstructorSetup.jsx'
+import {
+  fetchInstructorProfile as fetchSetupProfile,
+  hasAssignedSections,
+} from './services/instructorService'
 import { 
-  fetchInstructorProfile, 
   fetchCoursesWithMessages,
   fetchSectionsWithMessages,
   fetchInstructorCourses,
-  updateInstructorProfile,
   sendMessage,
   toggleMessagePin
 } from './services/database'
@@ -45,6 +48,8 @@ function App() {
   const [selectedSubjectId, setSelectedSubjectId] = useState(null)
   const [profile, setProfile] = useState(null)
   const [dataLoading, setDataLoading] = useState(false)
+  const [setupCheckLoading, setSetupCheckLoading] = useState(false)
+  const [hasSections, setHasSections] = useState(null)
 
   // Fetch instructor profile and courses when session is established
   useEffect(() => {
@@ -54,9 +59,11 @@ function App() {
       console.log('[App] Loading instructor data for:', session.user.email)
       console.log('[App] Auth user ID:', session.user.id)
       setDataLoading(true)
+      setSetupCheckLoading(true)
+      setHasSections(null)
       try {
         // Fetch instructor profile
-        const instructorProfile = await fetchInstructorProfile(session.user.email)
+        const instructorProfile = await fetchSetupProfile(session.user.id)
         console.log('[App] Instructor profile fetched:', instructorProfile)
         console.log('[App] Profile ID:', instructorProfile?.id)
 
@@ -71,6 +78,16 @@ function App() {
             avatarUrl: instructorProfile.avatar_url,
             bio: instructorProfile.bio,
           })
+
+          const assigned = await hasAssignedSections(instructorProfile.id)
+          setHasSections(assigned)
+          setSetupCheckLoading(false)
+
+          if (!assigned) {
+            setSubjects([])
+            setCourses([])
+            return
+          }
 
           // Fetch section-based subjects with messages
           const sectionsData = await fetchSectionsWithMessages(instructorProfile.id)
@@ -89,6 +106,7 @@ function App() {
         console.error('[App] Error loading instructor data:', error)
         toast.error('Failed to load data. Please try again.')
       } finally {
+        setSetupCheckLoading(false)
         setDataLoading(false)
       }
     }
@@ -239,20 +257,14 @@ function App() {
   const handleSaveProfile = async (updated) => {
     if (!profile?.id) return
     
-    const result = await updateInstructorProfile(profile.id, {
-      full_name: updated.fullName,
-      rank: updated.rank,
-      department: updated.department,
-      avatar_url: updated.avatarUrl,
-      bio: updated.bio,
-    })
-    
-    if (result) {
-      setProfile(updated)
-      toast.success('Profile updated successfully!')
-    } else {
-      toast.error('Failed to update profile. Please try again.')
-    }
+    setProfile((current) => ({ ...current, ...updated }))
+  }
+
+  const handleSetupComplete = async () => {
+    if (!profile?.id) return
+    const assigned = await hasAssignedSections(profile.id)
+    setHasSections(assigned)
+    if (assigned) await handleSectionChange()
   }
 
   const handleSectionChange = async (options = {}) => {
@@ -280,7 +292,11 @@ function App() {
     )
   }
 
-  if (dataLoading) {
+  if (!session) {
+    return <Login />
+  }
+
+  if (dataLoading || setupCheckLoading || hasSections === null) {
     return (
       <div className="home">
         <div className="home__card home__card--center">
@@ -290,8 +306,8 @@ function App() {
     )
   }
 
-  if (!session) {
-    return <Login />
+  if (hasSections === false) {
+    return <InstructorSetup instructorName={profile?.fullName} onComplete={handleSetupComplete} />
   }
 
   const renderPage = () => {
@@ -326,7 +342,6 @@ function App() {
           <Profile
             profile={profile}
             onSave={handleSaveProfile}
-            onAssigned={handleSectionChange}
           />
         )
       default:

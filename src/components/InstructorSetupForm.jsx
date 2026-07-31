@@ -46,15 +46,15 @@ export default function InstructorSetupForm({ onComplete }) {
       </button>
 
       {pendingCreate && (
-        <div className="alert alert--info" style={{ position: 'static', transform: 'none', margin: '14px 0' }}>
-          <span className="alert__msg">
+        <div className="setup-form__pending">
+          <span className="setup-form__pending-message">
             No existing section matches "{pendingCreate.courseCode} {pendingCreate.sectionName}".
             Create it as a new section under your name?
           </span>
-          <button type="button" className="login__link-btn login__link-btn--sm" onClick={confirmCreate}>
+          <button type="button" className="setup-form__confirm" onClick={() => confirmCreate(onComplete)}>
             Yes, create it
           </button>
-          <button type="button" className="alert__close" onClick={cancelCreate}>Cancel</button>
+          <button type="button" className="setup-form__cancel" onClick={cancelCreate}>Cancel</button>
         </div>
       )}
 

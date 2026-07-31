@@ -119,6 +119,34 @@
   white-space: pre-wrap;
 }
 
+.profile__assigned-sections {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 4px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.profile__assigned-section {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 9px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #f8fafc;
+  color: var(--text-h);
+  font-size: 13px;
+}
+
+.profile__assigned-section span:last-child {
+  flex-shrink: 0;
+  color: #64748b;
+  font-size: 12px;
+}
+
 .profile__form {
   display: flex;
   flex-direction: column;

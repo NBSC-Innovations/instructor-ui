@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { fetchAssignedSections, updateInstructorProfile } from '../services/instructorService'
 import '../styles/Profile.css'
-import SectionCodesField from '../components/SectionCodesField.jsx'
 
 // Department is descriptive metadata only — per the earlier discussion, it should
 // never be used to compute which sections an instructor can access (that's an
@@ -41,9 +41,31 @@ function getInitials(name) {
 // stays read-only in the UI regardless — it's the institutional-email identity used
 // to verify the account, not something an instructor should be able to self-edit.
 
-function Profile({ profile, onSave, onAssigned }) {
+function Profile({ profile, onSave }) {
   const [isEditing, setIsEditing] = useState(false)
-  const [form, setForm] = useState(profile || {})
+  const [form, setForm] = useState({
+    rank: profile?.rank || '',
+    department: profile?.department || '',
+  })
+  const [assignedSections, setAssignedSections] = useState([])
+  const [sectionsLoading, setSectionsLoading] = useState(true)
+  const [sectionsError, setSectionsError] = useState('')
+
+  useEffect(() => {
+    let active = true
+    fetchAssignedSections(profile?.id)
+      .then((sections) => {
+        if (active) setAssignedSections(sections)
+      })
+      .catch(() => {
+        if (active) setSectionsError('Unable to load assigned sections.')
+      })
+      .finally(() => {
+        if (active) setSectionsLoading(false)
+      })
+
+    return () => { active = false }
+  }, [profile?.id])
 
   const handleChange = (field) => (e) => {
     setForm((f) => ({ ...f, [field]: e.target.value }))
@@ -51,12 +73,22 @@ function Profile({ profile, onSave, onAssigned }) {
 
   const handleSave = (e) => {
     e.preventDefault()
-    onSave(form)
-    setIsEditing(false)
+    updateInstructorProfile(profile.id, form)
+      .then((updated) => {
+        onSave?.({
+          ...profile,
+          fullName: updated.full_name,
+          rank: updated.rank,
+          department: updated.department,
+        })
+        setForm({ rank: updated.rank || '', department: updated.department || '' })
+        setIsEditing(false)
+      })
+      .catch(() => setSectionsError('Unable to save profile changes.'))
   }
 
   const handleCancel = () => {
-    setForm(profile)
+    setForm({ rank: profile?.rank || '', department: profile?.department || '' })
     setIsEditing(false)
   }
 
@@ -88,41 +120,38 @@ function Profile({ profile, onSave, onAssigned }) {
         {!isEditing ? (
           <div className="profile__details">
             <div className="profile__field">
-              <span className="profile__field-label">Institutional Email</span>
-              <span className="profile__field-value">{profile?.email || '—'}</span>
+              <span className="profile__field-label">Name</span>
+              <span className="profile__field-value">{profile?.fullName || '—'}</span>
             </div>
             <div className="profile__field">
-              <span className="profile__field-label">College/Department</span>
-              <span className="profile__field-value">{profile?.department || '—'}</span>
+              <span className="profile__field-label">Email</span>
+              <span className="profile__field-value">{profile?.email || '—'}</span>
             </div>
             <div className="profile__field">
               <span className="profile__field-label">Rank</span>
               <span className="profile__field-value">{profile?.rank || '—'}</span>
             </div>
-            {profile?.bio && (
-              <div className="profile__field">
-                <span className="profile__field-label">Bio</span>
-                <span className="profile__field-value profile__field-value--bio">{profile.bio}</span>
-              </div>
-            )}
+            <div className="profile__field">
+              <span className="profile__field-label">Assigned Sections</span>
+              {sectionsLoading && <span className="profile__field-value">Loading...</span>}
+              {sectionsError && <span className="profile__field-value">{sectionsError}</span>}
+              {!sectionsLoading && !sectionsError && assignedSections.length === 0 && (
+                <span className="profile__field-value">No assigned sections.</span>
+              )}
+              {!sectionsLoading && !sectionsError && assignedSections.length > 0 && (
+                <ul className="profile__assigned-sections">
+                  {assignedSections.map((section) => (
+                    <li key={section.id} className="profile__assigned-section">
+                      <span>{section.courseCode || '—'} — {section.sectionName}</span>
+                      <span>{section.enrolledCount} enrolled</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
           </div>
         ) : (
           <form className="profile__form" onSubmit={handleSave}>
-            <label className="profile__label">
-              Full Name
-              <input
-                type="text"
-                value={form.fullName || ''}
-                onChange={handleChange('fullName')}
-                required
-              />
-            </label>
-
-            <label className="profile__label">
-              Institutional Email
-              <input type="email" value={form.email || ''} disabled />
-            </label>
-
             <label className="profile__label">
               College/Department
               <select value={form.department || ''} onChange={handleChange('department')}>
@@ -141,28 +170,6 @@ function Profile({ profile, onSave, onAssigned }) {
                 onChange={handleChange('rank')}
               />
             </label>
-
-            <label className="profile__label">
-              Avatar URL
-              <input
-                type="url"
-                placeholder="https://example.com/avatar.jpg"
-                value={form.avatarUrl || ''}
-                onChange={handleChange('avatarUrl')}
-              />
-            </label>
-
-            <label className="profile__label">
-              Bio
-              <textarea
-                placeholder="Tell us about yourself..."
-                value={form.bio || ''}
-                onChange={handleChange('bio')}
-                rows={4}
-              />
-            </label>
-
-            <SectionCodesField onAssigned={onAssigned} />
 
             <div className="profile__form-actions">
               <button type="button" className="profile__cancel" onClick={handleCancel}>

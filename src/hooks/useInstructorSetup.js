@@ -38,7 +38,7 @@ export function useInstructorSetup() {
     const { valid, errors } = isValidSectionRow(row);
     if (!valid) {
       updateRow(row.id, { status: 'error', message: Object.values(errors)[0] });
-      return;
+      return false;
     }
 
     updateRow(row.id, { status: 'checking', message: null });
@@ -48,8 +48,10 @@ export function useInstructorSetup() {
       if (result.status === 'unclaimed') {
         await claimSection(result.section.id);
         updateRow(row.id, { status: 'joined', message: 'Joined — existing section assigned to you.' });
+        return true;
       } else if (result.status === 'already_yours') {
         updateRow(row.id, { status: 'joined', message: 'Already assigned to you.' });
+        return true;
       } else if (result.status === 'taken') {
         updateRow(row.id, { status: 'error', message: 'Already assigned to another instructor. Contact an admin if this is wrong.' });
       } else if (result.status === 'not_found') {
@@ -59,14 +61,16 @@ export function useInstructorSetup() {
     } catch (err) {
       updateRow(row.id, { status: 'error', message: err.message || 'Something went wrong.' });
     }
+    return false;
   }
 
-  async function confirmCreate() {
+  async function confirmCreate(onComplete) {
     if (!pendingCreate) return;
     const { rowId, courseCode, sectionName } = pendingCreate;
     try {
       await createSection(courseCode, courseCode, sectionName);
       updateRow(rowId, { status: 'joined', message: 'Created new section, assigned to you.' });
+      onComplete?.();
     } catch (err) {
       updateRow(rowId, { status: 'error', message: err.message || 'Could not create section.' });
     } finally {
@@ -84,13 +88,15 @@ export function useInstructorSetup() {
   /** Submits every row sequentially; returns true if at least one row ended up 'joined'. */
   async function submitAll() {
     setSubmitting(true);
+    let anyJoined = false;
     for (const row of rows) {
       if (row.courseCode.trim() || row.sectionName.trim()) {
-        await submitRow(row);
+        const joined = await submitRow(row);
+        anyJoined = anyJoined || joined;
       }
     }
     setSubmitting(false);
-    return rows.some((r) => r.status === 'joined');
+    return anyJoined;
   }
 
   return {
